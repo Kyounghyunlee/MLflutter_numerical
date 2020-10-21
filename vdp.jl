@@ -1,7 +1,6 @@
 
-# Single experiment, move to ensemble further on
-# Some good parameter values are stored as comments right now
-# because this is really good practice
+# Numercal experiment of Van der Pol oscillator
+# Training data sets are generated from the ODE solutions
 
 using OrdinaryDiffEq
 using ModelingToolkit
@@ -142,7 +141,6 @@ res1 = DiffEqFlux.sciml_train(loss_lt_vdp, θ, ADAM(0.01), maxiters = 200)
 res1.minimum
 θ_=res1.minimizer
 
-
 ##
 function predict_nt_vdp(θ_t)
     p1,p2,p3,p4=θ_
@@ -196,21 +194,10 @@ res1 = DiffEqFlux.sciml_train(loss_nt_vdp, θn, ADAM(0.01), maxiters = 300)
 res1 = DiffEqFlux.sciml_train(loss_nt_vdp, res1.minimizer, BFGS(initial_stepnorm=1e-5), maxiters = 10000)
 res1.minimum
 θ_2=res1.minimizer
-θ_3=θ_2
 
 Ap=lt_pp_n_vdp(θ_2)
-#Checking the phase portrait of the model (Stable LCO)
-ind=1
-plot(Ap[ind][1,:],Ap[ind][2,:],xlabel="x",ylabel="y",label="ML model (μ=$(@sprintf("%.2f", Vel[ind])))")
-plot!(t_series[ind][1,:],t_series[ind][2,:],label="Data (μ=$(@sprintf("%.2f", Vel[ind])))",seriestype = :scatter,markersize=1.5,markerstrokewidth=0)
-ind=2
-plot!(Ap[ind][1,:],Ap[ind][2,:],label="ML model (μ=$(@sprintf("%.2f", Vel[ind])))")
-plot!(t_series[ind][1,:],t_series[ind][2,:],label="Data (μ=$(@sprintf("%.2f", Vel[ind])))",legend=:topleft,seriestype = :scatter,markersize=1.5,markerstrokewidth=0)
-ind=3
-plot!(Ap[ind][1,:],Ap[ind][2,:],label="ML model (μ=$(@sprintf("%.2f", Vel[ind])))")
-plot!(t_series[ind][1,:],t_series[ind][2,:],label="Data (μ=$(@sprintf("%.2f", Vel[ind])))",legend=:topleft,seriestype = :scatter,markersize=1.5,markerstrokewidth=0)
 
-@pgf Axis( {xlabel=L"$z_1$",
+a=@pgf Axis( {xlabel=L"$z_1$",
             ylabel = L"$z_2$",
             legend_pos  = "north west",
             height="9cm",
@@ -224,15 +211,17 @@ plot!(t_series[ind][1,:],t_series[ind][2,:],label="Data (μ=$(@sprintf("%.2f", V
         },
         Coordinates(Ap[1][1,:],Ap[1][2,:])
     ),
-    LegendEntry("Model"),
+    LegendEntry("Learnt model"),
     Plot(
         { color="blue",
             no_marks,
         },
         Coordinates(t_series[1][1,:],t_series[1][2,:])
     ),
-    LegendEntry("Measured data")
+    LegendEntry("Underlying model")
 )
+pgfsave("./Figures/num_vdp/vdp_1.pdf",a)
+
 
 @pgf Axis( {xlabel=L"$z_1$",
             ylabel = L"$z_2$",
@@ -248,68 +237,19 @@ plot!(t_series[ind][1,:],t_series[ind][2,:],label="Data (μ=$(@sprintf("%.2f", V
         },
         Coordinates(Ap[3][1,:],Ap[3][2,:])
     ),
-    LegendEntry("Model"),
+    LegendEntry("Learnt model"),
     Plot(
         { color="blue",
             no_marks,
         },
         Coordinates(t_series[3][1,:],t_series[3][2,:])
     ),
-    LegendEntry("Measured data")
+    LegendEntry("Underlying model")
 )
 
-savefig("vdp.pdf")
+pgfsave("./Figures/num_vdp/vdp_2.pdf",a)
 
-Vel2=[1.1,1.2,1.3]
-Ap=lt_pp_n_vdp(θ_2,Vel2)
-
-ind=1;u0=[1.0,1.0]
-plot(Ap[ind][1,:],Ap[ind][2,:],xlabel="x",ylabel="y",label="ML model (μ=$(@sprintf("%.2f", Vel2[ind])))")
-p_ = Vel2[ind]
-
-g=get_stable_LCO(p_,u0,15.0,1e-5,vdp,1e-8,3,1,2,0.0,0.0,0.1)
-plot!(g.u[:,1],g.u[:,2],label="Data (μ=$(@sprintf("%.2f", Vel2[ind])))",seriestype = :scatter,markersize=1.5,markerstrokewidth=0)
-ind=2
-plot!(Ap[ind][1,:],Ap[ind][2,:],label="ML model (μ=$(@sprintf("%.2f", Vel2[ind])))")
-p_ = Vel2[ind]
-g=get_stable_LCO(p_,u0,15.0,1e-5,vdp,1e-8,3,1,2,0.0,0.0,0.1)
-plot!(g.u[:,1],g.u[:,2],label="Data (μ=$(@sprintf("%.2f", Vel2[ind])))",seriestype = :scatter,markersize=1.5,markerstrokewidth=0)
-
-ind=3
-plot!(Ap[ind][1,:],Ap[ind][2,:],label="ML model (μ=$(@sprintf("%.2f", Vel2[ind])))")
-p_ = Vel2[ind]
-g=get_stable_LCO(p_,u0,15.0,1e-5,vdp,1e-8,3,1,2,0.0,0.0,0.1)
-plot!(g.u[:,1],g.u[:,2],label="Data (μ=$(@sprintf("%.2f", Vel2[ind])))",seriestype = :scatter,markersize=1.5,markerstrokewidth=0)
-
-savefig("vdp2.pdf")
-
-Vel2=[0.3,0.6,0.9]
-Ap=lt_pp_n_vdp(θ_2,Vel2)
-
-ind=1;u0=[1.0,1.0]
-plot(Ap[ind][1,:],Ap[ind][2,:],xlabel="x",ylabel="y",label="ML model (μ=$(@sprintf("%.2f", Vel2[ind])))")
-p_ = Vel2[ind]
-
-g=get_stable_LCO(p_,u0,10.0,1e-5,vdp,1e-8,3,1,2,0.0,0.0,0.01)
-plot!(g.u[:,1],g.u[:,2],label="Data (μ=$(@sprintf("%.2f", Vel2[ind])))",seriestype = :scatter,markersize=1.5,markerstrokewidth=0)
-ind=2
-plot!(Ap[ind][1,:],Ap[ind][2,:],label="ML model (μ=$(@sprintf("%.2f", Vel2[ind])))")
-p_ = Vel2[ind]
-g=get_stable_LCO(p_,u0,15.0,1e-5,vdp,1e-8,3,1,2,0.0,0.0,0.01)
-plot!(g.u[:,1],g.u[:,2],label="Data (μ=$(@sprintf("%.2f", Vel2[ind])))",seriestype = :scatter,markersize=1.5,markerstrokewidth=0)
-
-ind=3
-plot!(Ap[ind][1,:],Ap[ind][2,:],label="ML model (μ=$(@sprintf("%.2f", Vel2[ind])))")
-p_ = Vel2[ind]
-g=get_stable_LCO(p_,u0,15.0,1e-5,vdp,1e-8,3,1,2,0.0,0.0,0.01)
-plot!(g.u[:,1],g.u[:,2],label="Data (μ=$(@sprintf("%.2f", Vel2[ind])))",seriestype = :scatter,markersize=1.5,markerstrokewidth=0)
-
-savefig("vdp2.pdf")
-
-th0=theta0[1];vel=Vel[1]
-tol=1e-5
-
-function Inv_T_u_vdp(th0,vel,tol) # This function gives phase portrait of the transformed system from the normal form (unstable LCO)
+function Inv_T_u_vdp(th0,vel,tol) # This function gives initial conditions of the model
     p1,p2,p3,p4,=θ_[1:4]
     T=[p1 p3;p2 p4]
     np1=θ_2[1]
@@ -465,6 +405,31 @@ function predict_time_T_vdp(p) #,uu_t0
 Pr
 end
 
+
+st3=0.05
+
+t_s3=[Array(concrete_solve(ODEProblem(vdp,t_series[i][:,1],(0,tl2),Vel[i]), Tsit5(), t_series[i][:,1], Vel[i], saveat = st3)) for i in 1:length(Vel)]
+t_s2=[atan2(t_s3[i]) for i in 1:length(Vel)]
+
+vl=length(Vel)
+spl2=length(t_s2[1])
+t_s=zeros(vl,spl2)
+
+tol=1e-8
+np1=θ_2[1]
+pn=θ_2[2:end]
+s_amp=[sqrt(Vel[i]-np1) for i in 1:length(Vel)]
+theta0=[t_s2[i][1] for i in 1:length(Vel)]
+θ₀=[Inv_T_u_vdp(theta0[i],Vel[i],tol).th for i in 1:length(Vel)]
+u_t0=[[s_amp[i]*cos.(θ₀[i]),s_amp[i]*sin.(θ₀[i]),Vel[i]] for i in 1:length(Vel)]
+
+for i in 1:vl
+    t_s[i,:]=t_s2[i]
+end
+A3=t_s
+spl2=length(A3[1,:])
+#t_s3=[Array(concrete_solve(ODEProblem(vdp,t_series[i][:,1],(0,tl2),Vel[i]), Tsit5(), t_series[i][:,1], Vel[i], saveat = st3)) for i in 1:length(Vel)]
+
 function predict_time_T_vdp2(p) #,uu_t0
     np1=θ_2[1]
     pn=θ_2[2:end]
@@ -487,33 +452,6 @@ function predict_time_T_vdp2(p) #,uu_t0
 Pr
 end
 
-st3=0.05
-
-t_s2=[Array(concrete_solve(ODEProblem(vdp,t_series[i][:,1],(0,tl2),Vel[i]), Tsit5(), t_series[i][:,1], Vel[i], saveat = st3)) for i in 1:length(Vel)]
-t_s2=[atan2(t_s2[i]) for i in 1:length(Vel)]
-
-vl=length(Vel)
-#spl2=length(t_s2[1][1,:])
-spl2=length(t_s2[1])
-#t_s=zeros(vl*2,spl2)
-t_s=zeros(vl,spl2)
-
-tol=1e-8
-np1=θ_2[1]
-pn=θ_2[2:end]
-s_amp=[sqrt(Vel[i]-np1) for i in 1:length(Vel)]
-theta0=[t_s2[i][1] for i in 1:length(Vel)]
-θ₀=[Inv_T_u_vdp(theta0[i],Vel[i],tol).th for i in 1:length(Vel)]
-u_t0=[[s_amp[i]*cos.(θ₀[i]),s_amp[i]*sin.(θ₀[i]),Vel[i]] for i in 1:length(Vel)]
-
-for i in 1:vl
-    #t_s[[2*(i-1)+1,2*(i-1)+2],:]=t_s2[i]
-    t_s[i,:]=t_s2[i]
-end
-A3=t_s
-spl2=length(A3[1,:])
-t_s3=[Array(concrete_solve(ODEProblem(vdp,t_series[i][:,1],(0,tl2),Vel[i]), Tsit5(), t_series[i][:,1], Vel[i], saveat = st3)) for i in 1:length(Vel)]
-
 
 function loss_time_T_vdp(p)
     pred = predict_time_T_vdp(p)
@@ -522,21 +460,13 @@ end
 
 hidden=31
 nh2=10
-#ann3 = FastChain(FastDense(3, hidden, tanh),FastDense(hidden, 1, tanh))
-#ann3 = FastChain(FastDense(3, hidden, tanh),FastDense(hidden,1, tanh))
 ann3 = FastChain(FastDense(3, hidden, tanh),FastDense(hidden, nh2*2+1, tanh))
 np = initial_params(ann3)
-#np = zeros(length(np))
 aa=[-1,0.16]
-#aa=[omega,0.16,-10]
 p = vcat(aa,np)
 scale_f=1
 
 loss_time_T_vdp(p)
-predict_time_T_vdp(p)
-ind=3
-plot(predict_time_T_vdp(p)[ind,:])
-plot!(t_s2[ind,:])
 
 ##harmonic representation of phase
 res1 = DiffEqFlux.sciml_train(loss_time_T_vdp, p, ADAM(0.01), maxiters = 200)
@@ -549,54 +479,7 @@ p=res1.minimizer
 tv=range(0,tl2,length=length(A3[1,:]))
 
 ind=1
-#plot(tv,predict_time_T_vdp(p)[2*(ind-1)+1,:],xlims=(0.0,10.0),xlabel="time (sec)", ylabel="u",label="Model (μ=$(@sprintf("%.2f", Vel[ind])))",legend=(0.8, 0.3))
-#plot!(tv,t_series[ind][1,:],label="data",seriestype = :scatter,markersize=2,markerstrokewidth=0)
-plot(tv,predict_time_T_vdp(p)[ind,:],xlims=(0.0,10.0),xlabel="time (sec)", ylabel="θ (rad)",label="Model (μ=$(@sprintf("%.2f", Vel[ind])))",legend=(0.8, 0.3))
-#plot!(tv,t_s2[ind][1,:],label="data (μ=$(@sprintf("%.2f", Vel[ind])))",seriestype = :scatter,markersize=2,markerstrokewidth=0)
-plot!(tv,t_s2[ind],label="data (μ=$(@sprintf("%.2f", Vel[ind])))",seriestype = :scatter,markersize=2,markerstrokewidth=0)
-
-ind=2
-plot!(tv,predict_time_T_vdp(p)[ind,:],xlims=(0.0,10.0),label="Model (μ=$(@sprintf("%.2f", Vel[ind])))",legend=(0.8, 0.3))
-#plot!(tv,t_s2[ind][1,:],label="data (μ=$(@sprintf("%.2f", Vel[ind])))",seriestype = :scatter,markersize=2,markerstrokewidth=0)
-plot!(tv,t_s2[ind],label="data (μ=$(@sprintf("%.2f", Vel[ind])))",seriestype = :scatter,markersize=2,markerstrokewidth=0)
-
-ind=3
-plot!(tv,predict_time_T_vdp(p)[ind,:],xlims=(0.0,10.0),label="Model (μ=$(@sprintf("%.2f", Vel[ind])))",legend=(0.8, 0.3))
-#plot!(tv,t_s2[ind][1,:],label="data (μ=$(@sprintf("%.2f", Vel[ind])))",seriestype = :scatter,markersize=2,markerstrokewidth=0)
-plot!(tv,t_s2[ind],label="data (μ=$(@sprintf("%.2f", Vel[ind])))",seriestype = :scatter,markersize=2,markerstrokewidth=0)
-
-#=
-ind=10
-plot(predict_time_T_vdp(p)[2*(ind-1)+1,1:a],predict_time_T_vdp(p)[2*(ind-1)+2,1:a])
-plot!(t_series[ind][1,1:a],t_series[ind][2,1:a])
-=#
-
-savefig("phase_harmonic.pdf")
-
-ind=1
-#plot(tv,predict_time_T_vdp(p)[2*(ind-1)+1,:],xlims=(0.0,10.0),xlabel="time (sec)", ylabel="u",label="Model (μ=$(@sprintf("%.2f", Vel[ind])))",legend=(0.8, 0.3))
-#plot!(tv,t_series[ind][1,:],label="data",seriestype = :scatter,markersize=2,markerstrokewidth=0)
-plot(tv,predict_time_T_vdp2(p)[2*(ind-1)+1,:],xlims=(0.0,10.0),xlabel="time (sec)", ylabel="u",label="Model (μ=$(@sprintf("%.2f", Vel[ind])))",legend=(0.8, 0.3))
-#plot!(tv,t_s2[ind][1,:],label="data (μ=$(@sprintf("%.2f", Vel[ind])))",seriestype = :scatter,markersize=2,markerstrokewidth=0)
-plot!(tv,t_s3[ind][1,:],label="data (μ=$(@sprintf("%.2f", Vel[ind])))",seriestype = :scatter,markersize=2,markerstrokewidth=0)
-
-ind=2
-#plot(tv,predict_time_T_vdp(p)[2*(ind-1)+1,:],xlims=(0.0,10.0),xlabel="time (sec)", ylabel="u",label="Model (μ=$(@sprintf("%.2f", Vel[ind])))",legend=(0.8, 0.3))
-#plot!(tv,t_series[ind][1,:],label="data",seriestype = :scatter,markersize=2,markerstrokewidth=0)
-plot!(tv,predict_time_T_vdp2(p)[2*(ind-1)+1,:],xlims=(0.0,10.0),xlabel="time (sec)", ylabel="u",label="Model (μ=$(@sprintf("%.2f", Vel[ind])))",legend=(0.8, 0.3))
-#plot!(tv,t_s2[ind][1,:],label="data (μ=$(@sprintf("%.2f", Vel[ind])))",seriestype = :scatter,markersize=2,markerstrokewidth=0)
-plot!(tv,t_s3[ind][1,:],label="data (μ=$(@sprintf("%.2f", Vel[ind])))",seriestype = :scatter,markersize=2,markerstrokewidth=0)
-
-
-ind=3
-#plot(tv,predict_time_T_vdp(p)[2*(ind-1)+1,:],xlims=(0.0,10.0),xlabel="time (sec)", ylabel="u",label="Model (μ=$(@sprintf("%.2f", Vel[ind])))",legend=(0.8, 0.3))
-#plot!(tv,t_series[ind][1,:],label="data",seriestype = :scatter,markersize=2,markerstrokewidth=0)
-plot!(tv,predict_time_T_vdp2(p)[2*(ind-1)+1,:],xlims=(0.0,10.0),xlabel="time (sec)", ylabel="u",label="Model (μ=$(@sprintf("%.2f", Vel[ind])))",legend=(0.8, 0.3))
-#plot!(tv,t_s2[ind][1,:],label="data (μ=$(@sprintf("%.2f", Vel[ind])))",seriestype = :scatter,markersize=2,markerstrokewidth=0)
-# plot!(tv,t_s3[ind][1,:],label="data (μ=$(@sprintf("%.2f", Vel[ind])))",seriestype = :scatter,markersize=2,markerstrokewidth=0)
-
-ind=1
-@pgf Axis( {xlabel="Time (sec)",
+a=@pgf Axis( {xlabel="Time (sec)",
             ylabel = L"$z_1$",
             legend_pos  = "north west",
             height="9cm",
@@ -608,15 +491,16 @@ ind=1
         },
         Coordinates(tv,predict_time_T_vdp2(p)[2*(ind-1)+1,:])
     ),
-    LegendEntry("Model"),
+    LegendEntry("Learnt model"),
     Plot(
         { color="blue",
             no_marks,
         },
         Coordinates(tv,t_s3[ind][1,:])
     ),
-    LegendEntry("Measured data")
+    LegendEntry("Underlying model")
 )
+pgfsave("./Figures/num_vdp/vdp_t_020.pdf",a)
 
 ind=3
 @pgf Axis( {xlabel="Time (sec)",
@@ -631,65 +515,15 @@ ind=3
         },
         Coordinates(tv,predict_time_T_vdp2(p)[2*(ind-1)+1,:])
     ),
-    LegendEntry("Model"),
+    LegendEntry("Learnt model"),
     Plot(
         { color="blue",
             no_marks,
         },
         Coordinates(tv,t_s3[ind][1,:])
     ),
-    LegendEntry("Measured data")
+    LegendEntry("Underlying model")
 )
 
-savefig("time_series_vdp.pdf")
-
-μ=1.0
-u0=[1.0,1.0]
-
-spl2=50
-tspan=(0,20.0)
-tspan2=(0,10.0)
-uu0=[Array(solve(ODEProblem(vdp,u0,tspan,Vel[i]),Tsit5(),reltol=1e-8,absol=1e-8))[:,end] for i in 1:vl]
-uu=[Array(solve(ODEProblem(vdp,uu0[i],tspan2,Vel[i]),Tsit5(),reltol=1e-8,absol=1e-8))[:,1:50] for i in 1:vl]
-uu_t=[solve(ODEProblem(vdp,uu0[i],tspan2,Vel[i]),Tsit5(),reltol=1e-8,absol=1e-8).t[1:50] for i in 1:vl]
-tl2=[uu_t[i][end] for i in 1:vl]
-
-sol=solve(ODEProblem(vdp,u02,tspan2,μ),Tsit5(),reltol=1e-8,absol=1e-8)
-aa=Array(sol)
-plot(uu[10][1,:],uu[10][2,:],seriestype = :scatter,markersize=1)
-
-spl2=tt
-t_s=zeros(vl*2,spl2)
-for i in 1:vl
-    t_s[[2*(i-1)+1,2*(i-1)+2],:]=t_series[i]
-end
-A3=t_s
-
-theta0=[atan(t_series[i][2,1],t_series[i][1,1]) for i in 1:length(Vel)]
-θ₀=[Inv_T_u_vdp(theta0[i],Vel[i]-np1,tol).th for i in 1:length(Vel)]
-u_t0=[[s_amp[i]*cos.(θ₀[i]),s_amp[i]*sin.(θ₀[i]),Vel[i]] for i in 1:length(Vel)]
-
-
-function predict_time_T_vdp(p) #,uu_t0
-    np1=θ_2[1]
-    pn=θ_2[2:end]
-    p1,p2,p3,p4=θ_[1:4]
-    T=[p1 p3;p2 p4]
-    A1=[Array(concrete_solve(ODEProblem(dudt_nf_vdp,u_t0[i],(0,tl2[i]),p), Tsit5(), u_t0[i], p, saveat = uu_t[i],
-                         abstol=1e-8, reltol=1e-8,
-                         sensealg = InterpolatingAdjoint(autojacvec=ReverseDiffVJP()))) for i in 1:length(Vel)]
-    uu=[transpose(hcat(A1[i][1,:],A1[i][2,:],A1[i][3,:])) for i in 1:vl]
-    delU=zeros(2,spl2)
-    delU2=-np1*ones(1,spl2)
-    delU=vcat(delU,delU2)
-    uu=[uu[i]+delU for i in 1:vl]
-    vlT=[T*uu[i][1:2,:]+Array_chain(uu[i],ann,pn)/scale_f for i in 1:vl]
-    Pr=zeros(0,spl2)
-    for i in 1:vl
-        theta=vlT[i][[1,2],:]
-        Pr=vcat(Pr,theta)
-    end
-Pr
-end
-
-@save "vdp.jld" p
+pgfsave("./Figures/num_vdp/vdp_t_100.pdf",a)
+@save "./saved_file/ML_vdp_num.jld" p θ_ θ_n θ t_series  #save the results

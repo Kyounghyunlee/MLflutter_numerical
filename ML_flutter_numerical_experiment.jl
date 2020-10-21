@@ -1,10 +1,7 @@
-using OrdinaryDiffEq
-using ModelingToolkit
-using DataDrivenDiffEq
-using LinearAlgebra, DiffEqSensitivity, Optim
-using DiffEqFlux, Flux
-using Printf,PGFPlotsX,LaTeXStrings, JLD2
-using MAT
+# Numercal experiment of Flutter model ML modelling
+# Training data sets are generated from the ODE solutions
+
+using OrdinaryDiffEq,ModelingToolkit,DataDrivenDiffEq,LinearAlgebra, DiffEqSensitivity, Optim,DiffEqFlux, Flux, Printf,PGFPlotsX,LaTeXStrings, JLD2, MAT
 include("Numerical_Cont.jl")
 @load "/Users/kyoung/OneDrive - University of Bristol/Documents/Simulations/Flutter_noise/flutter.jld"
 # Numerical continuation of the experimental model
@@ -26,7 +23,7 @@ amp=amp_LCO(U,N,1,ind)
 plot(P,amp)
 θ_l=100
 
-function flutter_eq_CBC(du,u, p, t) #Flutter equation of motion for Model 1
+function flutter_eq_CBC(du,u, p, t) #Flutter equation of motion
     μ,Kp,Kd,Fa,Fω=p[1:5]
     c=p[6:end]
     ind1=1;ind2=3;
@@ -73,7 +70,7 @@ function flutter_eq_CBC(du,u, p, t) #Flutter equation of motion for Model 1
     du[6]=du_[6]
 end
 
-function generate_data(vel_l,Vel,nh)
+function generate_data(vel_l,Vel,nh) # Training data
     #Generate training data
     u0=Float32[2e-1,0,2e-1,0,0,0];
     tol=1e-7;stol=1e-8
@@ -107,8 +104,8 @@ function generate_data(vel_l,Vel,nh)
     siθ=sin.(θ)
     return (data=AA,ts=t_series,d0=[u₀,v₀],data2=Al,coθ=coθ,siθ=siθ,theta_s=θ_series)
 end
-## Normal form
 
+## Normal form
 function nf_dis(U₀,s,Vel,Vel2)
     del=Vel-U₀*ones(length(Vel))
     del2=Vel2-U₀*ones(length(Vel2))
@@ -224,17 +221,9 @@ loss_lt(θ)
 res1 = DiffEqFlux.sciml_train(loss_lt, θ, ADAM(0.01), maxiters = 200)
 res1.minimum
 θ_=res1.minimizer
-
-# Check the phase portrait of the linear transformation to see transformation is working properly
 Ap=lt_pp(θ_)
-ind=1
-plot(Ap[ind][1,:],Ap[ind][2,:],xlabel="Heave (m)",ylabel="Pitch (rad)",label="ML model (U=15.5 stable LCO)")
-plot!(t_series[ind][1,:],t_series[ind][2,:],label="Data (U=15.5 stable LCO)",seriestype = :scatter,markersize=1.5,markerstrokewidth=0)
-ind=10
-plot!(Ap[ind][1,:],Ap[ind][2,:],label="ML model (U=18.0 stable LCO)")
-plot!(t_series[ind][1,:],t_series[ind][2,:],label="Data (U=18.0 stable LCO)",legend=:topleft,seriestype = :scatter,markersize=1.5,markerstrokewidth=0)
 
-@pgf Axis( {xlabel=L"$h$ (m)",
+a=@pgf Axis( {xlabel=L"$h$ (m)",
             ylabel = L"$\alpha$ (rad)",
             legend_pos  = "north west",
             height="9cm",
@@ -246,18 +235,18 @@ plot!(t_series[ind][1,:],t_series[ind][2,:],label="Data (U=18.0 stable LCO)",leg
         },
         Coordinates(Ap[1][1,:],Ap[1][2,:])
     ),
-    LegendEntry("Model"),
+    LegendEntry("Learnt model"),
     Plot(
         { color="blue",
             no_marks,
         },
         Coordinates(t_series[1][1,:],t_series[1][2,:])
     ),
-    LegendEntry("Measured data")
+    LegendEntry("Underlying model")
 )
 
+pgfsave("./Figures/num_flutter/LTU15_5.pdf",a)
 
-savefig("PP_compare_LT.pdf")
 
 ## Add neural network to transformation to improve the model
 function predict_nt(θ_t)
@@ -356,21 +345,11 @@ pp=[18.27,3.65]
 loss_nt(θn)
 
 res1 = DiffEqFlux.sciml_train(loss_nt, θn, ADAM(0.01), maxiters = 300)
-#res1 = DiffEqFlux.sciml_train(loss_nt, res1.minimizer, BFGS(initial_stepnorm=1e-6), maxiters = 10000)
 
 res1.minimum
 θ_2=res1.minimizer
 
 Ap=lt_pp_n(θ_2)
-#Checking the phase portrait of the model (Stable LCO)
-ind=1
-Vel[ind]
-plot(Ap[ind][1,:],Ap[ind][2,:],xlabel="Heave (m)",ylabel="Pitch (rad)",label="ML model (U=15.5 stable LCO)")
-plot!(t_series[ind][1,:],t_series[ind][2,:],label="Data (U=15.5 stable LCO)",seriestype = :scatter,markersize=1.5,markerstrokewidth=0)
-ind=10
-plot!(Ap[ind][1,:],Ap[ind][2,:],label="ML model (U=18.0 stable LCO)")
-plot!(t_series[ind][1,:],t_series[ind][2,:],label="Data (U=18.0 stable LCO)",legend=:topleft,seriestype = :scatter,markersize=1.5,markerstrokewidth=0)
-
 
 ind=1
 a=@pgf Axis( {xlabel=L"$h$ (m)",
@@ -395,16 +374,13 @@ a=@pgf Axis( {xlabel=L"$h$ (m)",
     LegendEntry("Underlying model")
 )
 
-pgfsave("PP_compare_s15.pdf",a)
+pgfsave("./Figures/num_flutter/NN_U15.pdf",a)
 
-savefig("PP_compare_stable.pdf")
 #Checking the phase portrait of the model (Unstable LCO)
 Ap=lt_pp_n_u(θ_2,Vel2)
 ind=1 # Near the fold
 vv=Vel2[ind]
-#plot(Ap[ind][1,:],Ap[ind][2,:],xlabel="Heave (m)",ylabel="Pitch (rad)",label="Model (U= $(@sprintf("%.2f", vv))  unstable LCO)")
 uu=get_sol(U[s_ind[ind]],N,1,3)
-#plot!(uu.u[1,:],uu.u[3,:],label="Data (U= $(@sprintf("%.2f", vv)) unstable LCO)",seriestype = :scatter,markersize=3)
 
 a=@pgf Axis( {xlabel=L"$h$ (m)",
             ylabel = L"$\alpha$ (rad)",
@@ -429,15 +405,13 @@ a=@pgf Axis( {xlabel=L"$h$ (m)",
     LegendEntry("Underlying model")
 )
 
-pgfsave("PP_compare_u171.pdf",a)
+pgfsave("./Figures/num_flutter/ust_u17.pdf",a)
+
 ind=2
 vv=Vel2[ind]# Near the equilibrium
-plot!(Ap[ind][1,:],Ap[ind][2,:],label="Model (U=$(@sprintf("%.2f", vv))  unstable LCO)")
 uu=get_sol(U[s_ind[ind]],50,1,3)
-plot!(uu.u[1,:],uu.u[3,:],label="Data (U=$(@sprintf("%.2f", vv))  unstable LCO)",seriestype = :scatter,markersize=3,legend=:bottomright)
-savefig("PP_compare_u.pdf")
 
-@pgf Axis( {xlabel=L"$h$ (m)",
+a=@pgf Axis( {xlabel=L"$h$ (m)",
             ylabel = L"$\alpha$ (rad)",
             legend_pos  = "north west",
             height="9cm",
@@ -451,15 +425,17 @@ savefig("PP_compare_u.pdf")
         },
         Coordinates(Ap[2][1,:],Ap[2][2,:])
     ),
-    LegendEntry("Model"),
+    LegendEntry("Learnt model"),
     Plot(
         { color="blue",
             no_marks,
         },
         Coordinates(vcat(uu.u[1,:],uu.u[1,1]),vcat(uu.u[3,:],uu.u[3,1]))
     ),
-    LegendEntry("Measured data")
+    LegendEntry("Underlying model")
 )
+
+pgfsave("./Figures/num_flutter/ust_u179.pdf",a)
 
 u_ind=[400,750]
 Vel3=[P[u_ind[i]] for i in 1:length(u_ind)]
@@ -467,9 +443,7 @@ Ap=lt_pp_n_u(θ_2,Vel3)
 
 ind=1
 vv=Vel3[ind]
-plot(Ap[ind][1,:],Ap[ind][2,:],xlabel="Heave (m)",ylabel="Pitch (rad)",label="Model (U=$(@sprintf("%.2f", vv))  unstable LCO)")
 uu=get_sol(U[u_ind[ind]],N,1,3)
-plot!(uu.u[1,:],uu.u[3,:],label="Data (U=$(@sprintf("%.2f", vv))  unstable LCO)",seriestype = :scatter,markersize=3)
 
 a=@pgf Axis( {xlabel=L"$h$ (m)",
             ylabel = L"$\alpha$ (rad)",
@@ -494,13 +468,11 @@ a=@pgf Axis( {xlabel=L"$h$ (m)",
     ),
     LegendEntry("Underlying model")
 )
-pgfsave("PP_compare_u154.pdf",a)
+pgfsave("./Figures/num_flutter/ust_u153.pdf",a)
 
 ind=2 # Near the equilibrium
 vv=Vel3[ind]
-plot!(Ap[ind][1,:],Ap[ind][2,:],label="Model (U=$(@sprintf("%.2f", vv))  unstable LCO)")
 uu=get_sol(U[u_ind[ind]],50,1,3)
-plot!(uu.u[1,:],uu.u[3,:],label="Data (U=$(@sprintf("%.2f", vv))  unstable LCO)",seriestype = :scatter,markersize=3,legend=:bottomright)
 
 a=@pgf Axis( {xlabel=L"$h$ (m)",
             ylabel = L"$\alpha$ (rad)",
@@ -525,14 +497,13 @@ a=@pgf Axis( {xlabel=L"$h$ (m)",
     ),
     LegendEntry("Underlying model")
 )
-pgfsave("PP_compare_u1813.pdf",a)
+pgfsave("./Figures/num_flutter/ust_u1813.pdf",a)
 
 θ=[θ_;θ_2]
 θ_t=θ
 ## Compare the bifurcation diagram
 function lt_b_dia(θ_t,ind)
     vel_l=300
-
     p1,p2,p3,p4,p5,p6=θ_t[1:6]
     T=[p1 p3;p2 p4]
     np1,np2=θ_t[7:8]
@@ -553,19 +524,12 @@ bd=lt_b_dia(θ,1)
 h=[maximum(t_series[i][1,:])-minimum(t_series[i][1,:]) for i in 1:length(Vel)]
 d_amp=[amp[s_ind[i]] for i in 1:length(s_ind)]
 d_P=[P[s_ind[i]] for i in 1:length(s_ind)]
-
-plot(bd.v,bd.s,label="Stable LCO (ML model)")
-plot!(bd.v,bd.u,label="Unstable LCO (ML model)")
-plot!(P,amp,label="Experimental model (numerical continuation)",color=:black)
-plot!(Vel,h,seriestype = :scatter,label="Training data (stable)",legend=:right,xlabel="Wind speed (m/sec)",ylabel="Heave amplitude (m)",markerstrokewidth=0)
-plot!(d_P,d_amp,seriestype = :scatter,label="Training data (unstable)",markerstrokewidth=0)
-savefig("BD_compare.pdf")
 P=vec(P)
 amp=vec(amp)
-
 vv=vcat(bd.v,bd.v)
 aa=vcat(bd.s,bd.u)
 
+#Plot bifurcation diagram
 a=@pgf Axis( {xlabel="Wind speed (m/sec)",
             ylabel = "Heave amplitude (m)",
             legend_pos  = "north west",
@@ -613,14 +577,9 @@ Plot(
     ),
 )
 
-pgfsave("bd_ML.pdf",a)
+pgfsave("./Figures/num_flutter/bd_flutter.pdf",a)
 
-
-th0=theta0[i]
-vel=Vel[i]
-tol=1e-8
-
-function Inv_T_u(th0,vel,tol) # This function gives phase portrait of the transformed system from the normal form (unstable LCO)
+function Inv_T_u(th0,vel,tol) # This function gives initial conditions of the model
     p1,p2,p3,p4,p5,p6=θ_[1:6]
     T=[p1 p3;p2 p4]
     np1,np2=θ_2[1:2]
@@ -667,7 +626,6 @@ function dudt_ph(u,p,t)
     ν=(c-δ₀)
     ω₀=p[1]
     uu=[r*cos(θ),r*sin(θ),ν]
-#    uu=[r,ν]
     du₁=ω₀+ann3(uu,p[2:end])[1]/om_scale
     du₂=0
     du₃=0
@@ -678,16 +636,10 @@ function predict_time_T(p) #,uu_t0
     np1,np2=θ_2[1:2]
     pn=θ_2[3:end]
     p1,p2,p3,p4,p5,p6=θ_[1:6]
-#    T=[p1 p3 0;p2 p4 0]
     T=[p1 p3;p2 p4]
-#    T2=[1 0 0;0 1 0]
-#    s_amp=[sqrt(np2/2+sqrt(np2^2+4*(Vel[i]-np1))/2) for i in 1:length(Vel)]
     A1=[Array(concrete_solve(ODEProblem(dudt_ph,u_t0[i],(0,tl2),p), Tsit5(), u_t0[i], p, saveat = st,
                          abstol=1e-8, reltol=1e-8,
                          sensealg = InterpolatingAdjoint(autojacvec=ReverseDiffVJP()))) for i in 1:length(Vel)]
-#    A1=[Array(concrete_solve(ODEProblem(dudt_nf,u_t0[i],(0,tl2),p), Tsit5(), u_t0[i], p, saveat = st,
-#                         abstol=1e-8, reltol=1e-8,
-#                         sensealg = InterpolatingAdjoint(autojacvec=ReverseDiffVJP()))) for i in 1:length(Vel)]
     uu=[transpose(hcat(A1[i][2,:].*cos.(A1[i][1,:]),A1[i][2,:].*sin.(A1[i][1,:]),A1[i][3,:])) for i in 1:vl]
     delU=zeros(2,spl)
     delU2=-np1*ones(1,spl)
@@ -698,9 +650,6 @@ function predict_time_T(p) #,uu_t0
     vlT=[dis*norm(uu[i][1:2])^2+T*uu[i][1:2,:]+Array_chain(uu[i],ann,pn)/scale_f for i in 1:vl]
     Pr=zeros(0,spl)
     for i in 1:vl
-#        z1=vlT[i][1,:]
-#        z2=vlT[i][2,:]
-#        theta=transpose(atan.(z2,z1))
         theta=vlT[i][[1,2],:]
         Pr=vcat(Pr,theta)
     end
@@ -715,7 +664,6 @@ ann3 = FastChain(FastDense(3, hidden, tanh),FastDense(hidden, 1, tanh))
 np = initial_params(ann3)
 omega=15.3
 p = vcat(omega,np)
-
 
 # Generate data and initial θ
 np1,np2=θ_2[1:2]
@@ -736,13 +684,10 @@ for i in 1:vl
     t_s[[2*(i-1)+1,2*(i-1)+2],:]=t_series[i]
 end
 A3=t_s
-t_series
 
 function loss_time_T(p)
     pred = predict_time_T(p)
-#    pred = hcat(pred)
-    sum(abs2, A3 .- pred) # + 1e-5*sum(sum.(abs, params(ann)))
-#    norm(pred-A3)
+    sum(abs2, A3 .- pred)
 end
 
 om_scale=0.3
@@ -753,17 +698,7 @@ res1 = DiffEqFlux.sciml_train(loss_time_T, res1.minimizer, BFGS(initial_stepnorm
 res1.minimum
 p=res1.minimizer
 
-@save "flutter.jld" p
-
 tv=range(0,1,length=1001)
-ind=1
-plot(tv,predict_time_T(p)[2*(ind-1)+1,:],xlims=(0.0,1.0),xlabel="time (sec)", ylabel="Heave (m)",label="Model U = 15.0 m/sec")
-plot!(tv,t_series[ind][1,:],label="data",seriestype = :scatter,markersize=2,markerstrokewidth=0)
-
-ind=10
-plot!(tv,predict_time_T(p)[2*(ind-1)+1,:],xlims=(0.0,1.0),xlabel="time (sec)", ylabel="Heave (m)",label="Model U = 18.0 m/sec")
-plot!(tv,t_series[ind][1,:],label="data",seriestype = :scatter,markersize=2,markerstrokewidth=0)
-
 a=@pgf Axis( {xlabel="Time (sec)",
             ylabel = L"$h$ (m)",
             legend_pos  = "north west",
@@ -786,7 +721,7 @@ a=@pgf Axis( {xlabel="Time (sec)",
     LegendEntry("Underlying model")
 )
 
-pgfsave("t_series_15.pdf",a)
+pgfsave("./Figures/num_flutter/time_u15.pdf",a)
 
 a=@pgf Axis( {xlabel="Time (sec)",
             ylabel = L"$h$ (m)",
@@ -809,8 +744,6 @@ a=@pgf Axis( {xlabel="Time (sec)",
     ),
     LegendEntry("Underlying model")
 )
-pgfsave("t_series_18.pdf",a)
+pgfsave("./Figures/num_flutter/time_u18.pdf",a)
 
-savefig("freq.pdf")
-
-@save "flutter.jld"
+@save "./saved_file/ML_flutter_num.jld" p θ_ θ_n θ t_series  #save the results

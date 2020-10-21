@@ -1,6 +1,7 @@
+#Numerical experiment for the CBC experiment of the flutter model control is added at the heave
 using DifferentialEquations, NLsolve, Plots, Statistics, LinearAlgebra, StaticArrays, NLsolve, PGFPlotsX,LaTeXStrings
 
-function flutter_eq_CBC(u, p, t) #Flutter equation of motion for Model 1
+function flutter_eq_CBC(u, p, t) #Flutter equation of motion
     μ=p.p[1]
     Kp=p.p[2]
     Kd=p.p[3]
@@ -783,7 +784,6 @@ jeq2=flutter_eq_CBC_J2;
 @time s0=continuation_flutter(tol,N,sp,sU,ds)
 amp1=amp_LCO(s0.V,1)
 p1=vec(s0.P)
-plot(p1,amp1)
 # Continuation of CBC problem
 sp=30;tol=1e-7;ctol=1e-6;N=100;sU=15.1;ds=0.01;nh=10;
 @time s_cbc=continuation_CBC(tol,ctol,N,sp,sU,ds,nh)
@@ -791,8 +791,6 @@ U=s_cbc.U
 P=s_cbc.P
 amp=amp_LCO(U,1)
 P=vec(P)
-plot!(P,amp)
-
 
 #Bifurcation diagram plot
 a=@pgf Axis( {xlabel="Wind speed (m/s)",
@@ -826,8 +824,6 @@ s=LCO_solve(uu[1:end-1],uu[end],eq,jeq,p0,1e-3,1e-11)
 
 g=get_sol(s.u,6,N,1,3)
 g2=get_sol(uu,6,N,1,3)
-plot!(vcat(g.u[:,1],g.u[1,1]),vcat(g.u[:,3],g.u[1,3]))
-plot!(vcat(g2.u[:,1],g.u[1,1]),vcat(g2.u[:,3],g.u[1,3]))
 
 nu1=Monodromy_compute(s.u,p0,6,N)
 r1=real(nu1)
@@ -865,7 +861,6 @@ a=@pgf Axis( {xlabel=L"$h$ (m)",
 )
 pgfsave("ppcbc_16.pdf",a)
 #Monodromy matrix
-
 
 xx=[cos(θ) for θ in range(0,2π,length=100)]
 yy=[sin(θ) for θ in range(0,2π,length=100)]
@@ -930,8 +925,6 @@ s=LCO_solve(uu[1:end-1],uu[end],eq,jeq,p0,1e-3,1e-11)
 
 g=get_sol(s.u,6,N,1,3)
 g2=get_sol(uu,6,N,1,3)
-plot!(vcat(g.u[:,1],g.u[1,1]),vcat(g.u[:,3],g.u[1,3]))
-plot!(vcat(g2.u[:,1],g.u[1,1]),vcat(g2.u[:,3],g.u[1,3]))
 
 nu1=Monodromy_compute(s.u,p0,6,N)
 r1=real(nu1)
@@ -1023,5 +1016,4 @@ a=@pgf Axis(
             Coordinates(xx,yy)
         ),
 )
-
 pgfsave("monodromy_17.pdf",a)

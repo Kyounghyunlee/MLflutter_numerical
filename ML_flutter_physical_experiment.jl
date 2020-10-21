@@ -1,3 +1,5 @@
+# Training ML model with experimental data
+
 using OrdinaryDiffEq
 using ModelingToolkit
 using DataDrivenDiffEq
@@ -6,8 +8,6 @@ using DiffEqFlux, Flux
 using Printf,PGFPlotsX,LaTeXStrings, JLD2
 using MAT
 include("Numerical_Cont.jl")
-#@load "/Users/kyoung/OneDrive - University of Bristol/Documents/Simulations/Flutter_noise/flutter.jld"
-# Numerical continuation of the experimental model
 
 ## Save data
 nh=30
@@ -233,27 +233,8 @@ ann_l = FastChain(FastDense(2, hidden, tanh),FastDense(hidden, hidden, tanh), Fa
 scale_f2=1e2
 θ=vcat(θ,θl)
 pp=[17.95,3.85]
-θ=vcat(θ,pp)
+θ=vcat(θ,pp) # Initial guess of parameters
 
-#θ=θ_
-loss_lt(θ)
-res_l = DiffEqFlux.sciml_train(loss_lt, θ, ADAM(0.001), maxiters = 500)
-#res_l = DiffEqFlux.sciml_train(loss_lt, res_l.minimizer, BFGS(initial_stepnorm=1e-4), maxiters = 10000)
-U₀=res_l.minimizer[end-1];s_=res_l.minimizer[end]
-res_l = DiffEqFlux.sciml_train(loss_lt2, res_l.minimizer, BFGS(initial_stepnorm=1e-4), maxiters = 20000)
-
-res_l.minimum
-θ_=res_l.minimizer
-# Check the phase portrait of the linear transformation to see transformation is working properly
-Ap=lt_pp(θ_)
-ind=1
-plot(Ap[ind][1,:],Ap[ind][2,:],xlabel="Heave (m)",ylabel="Pitch (rad)",label="ML model (U=15.5 stable LCO)")
-plot!(t_series[ind][1,:],t_series[ind][2,:],label="Data (U=15.5 stable LCO)",seriestype = :scatter,markersize=1.5,markerstrokewidth=0)
-ind=4
-plot!(Ap[ind][1,:],Ap[ind][2,:],label="ML model (U=18.0 stable LCO)")
-plot!(t_series[ind][1,:],t_series[ind][2,:],label="Data (U=18.0 stable LCO)",legend=:topleft,seriestype = :scatter,markersize=1.5,markerstrokewidth=0)
-
-S=SMatrix{81,81}(randn(81,81))
 ## Add neural network to transformation to improve the model
 function predict_nt(θ_t)
     p1,p2,p3,p4,p5,p6=θ_[1:6]
@@ -290,12 +271,12 @@ function lt_pp_n(θ_t) # This function gives phase portrait of the transformed s
     vcat(vlT,vlT2)
 end
 
-
-function loss_nt(θ_t)
+function loss_nt(θ_t) # Loss function
     pred = predict_nt(θ_t)
     sum(abs2, AA .- pred) # + 1e-5*sum(sum.(abs, params(ann)))
 end
 
+# set neural network
 hidden=11
 ann = FastChain(FastDense(3, hidden, tanh),FastDense(hidden, hidden, tanh), FastDense(hidden,  2))
 θn = initial_params(ann)
@@ -303,39 +284,24 @@ scale_f=1e3
 
 loss_nt(θn)
 
-res_l = DiffEqFlux.sciml_train(loss_lt, θ, ADAM(0.001), maxiters = 800)
+res_l = DiffEqFlux.sciml_train(loss_lt, θ, ADAM(0.001), maxiters = 800) # First, train the simple model
 U₀=res_l.minimizer[end-1];s_=res_l.minimizer[end]
 θ_=res_l.minimizer
 res_l = DiffEqFlux.sciml_train(loss_lt2, res_l.minimizer, BFGS(initial_stepnorm=1e-4), maxiters = 20000)
-res1 = DiffEqFlux.sciml_train(loss_nt, θn, ADAM(0.001), maxiters = 1000)
+res1 = DiffEqFlux.sciml_train(loss_nt, θn, ADAM(0.001), maxiters = 1000) # Train more complicated model
 res_n = DiffEqFlux.sciml_train(loss_nt, res1.minimizer, BFGS(initial_stepnorm=1e-4), maxiters = 10000)
-#res1 = DiffEqFlux.sciml_train(loss_nt, θn, NADAM(0.001, (0.89, 0.995)), maxiters = 1000)
 
-
-res1.minimum
-res_n.minimum
 θ_n=res_n.minimizer
-θ_n2=θ_n
-θ_n3=res1.minimizer
 Ap=lt_pp_n(θ_n)
-θ_n=θ_n3
-#Checking the phase portrait of the model (Stable LCO)
-ind=4
-Vel[ind]
-plot(Ap[ind][1,:],Ap[ind][2,:],xlabel="Heave (m)",ylabel="Pitch (rad)",label="ML model (U=15.5 stable LCO)")
-plot!(t_series[ind][1,:],t_series[ind][2,:],label="Data (U=15.5 stable LCO)",seriestype = :scatter,markersize=1.5,markerstrokewidth=0)
-ind=7
-plot!(Ap[ind][1,:],Ap[ind][2,:],label="ML model (U=18.0 stable LCO)")
-plot!(t_series[ind][1,:],t_series[ind][2,:],label="Data (U=18.0 stable LCO)",legend=:topleft,seriestype = :scatter,markersize=1.5,markerstrokewidth=0)
 
-sens=18/100
+sens=18/100 # sensitivity of the lasor sensor
 
 a=@pgf Axis( {xlabel=L"$h$ (m)",
             ylabel = L"$\alpha$ (rad)",
             legend_pos  = "north west",
             height="9cm",
             width="9cm",
-            xmin=-4e-2,xmax=4e-2,ymin=8e-2,ymin=-8e-2},
+            xmin=-4e-2,xmax=4e-2,ymax=7e-2,ymin=-8e-2},
 
     Plot(
         { color="red",
@@ -343,7 +309,7 @@ a=@pgf Axis( {xlabel=L"$h$ (m)",
         },
         Coordinates(Ap[1][1,:]*sens,Ap[1][2,:])
     ),
-    LegendEntry("Model"),
+    LegendEntry("Learnt model"),
     Plot(
         { color="blue",
             mark  = "o",
@@ -353,13 +319,14 @@ a=@pgf Axis( {xlabel=L"$h$ (m)",
     ),
     LegendEntry("Measured data")
 )
-pgfsave("pp_s149.pdf",a)
+pgfsave("./Figures/exp/pp_s149.pdf",a)
+
 a=@pgf Axis( {xlabel=L"$h$ (m)",
             ylabel = L"$\alpha$ (rad)",
             legend_pos  = "north west",
             height="9cm",
             width="9cm",
-            xmin=-4e-2,xmax=4e-2,ymin=8e-2,ymin=-8e-2},
+            xmin=-4e-2,xmax=4e-2,ymax=7e-2,ymin=-8e-2},
 
     Plot(
         { color="red",
@@ -367,7 +334,7 @@ a=@pgf Axis( {xlabel=L"$h$ (m)",
         },
         Coordinates(Ap[5][1,:]*sens,Ap[5][2,:])
     ),
-    LegendEntry("Model"),
+    LegendEntry("Learnt model"),
     Plot(
         { color="blue",
             mark  = "o",
@@ -377,7 +344,7 @@ a=@pgf Axis( {xlabel=L"$h$ (m)",
     ),
     LegendEntry("Measured data")
 )
-pgfsave("pp_u149.pdf",a)
+pgfsave("./Figures/exp/pp_s149pp_u149.pdf",a)
 
 ##
 a=@pgf Axis( {xlabel=L"$h$ (m)",
@@ -385,7 +352,7 @@ a=@pgf Axis( {xlabel=L"$h$ (m)",
             legend_pos  = "north west",
             height="9cm",
             width="9cm",
-            xmin=-4e-2,xmax=4e-2,ymin=8e-2,ymin=-8e-2},
+            xmin=-4e-2,xmax=4e-2,ymax=7e-2,ymin=-8e-2},
 
     Plot(
         { color="red",
@@ -393,7 +360,7 @@ a=@pgf Axis( {xlabel=L"$h$ (m)",
         },
         Coordinates(Ap[3][1,:]*sens,Ap[3][2,:])
     ),
-    LegendEntry("Model"),
+    LegendEntry("Learnt model"),
     Plot(
         { color="blue",
             mark  = "o",
@@ -403,13 +370,13 @@ a=@pgf Axis( {xlabel=L"$h$ (m)",
     ),
     LegendEntry("Measured data")
 )
-pgfsave("pp_s165.pdf",a)
+pgfsave("./Figures/exp/pp_s165.pdf",a)
 a=@pgf Axis( {xlabel=L"$h$ (m)",
             ylabel = L"$\alpha$ (rad)",
             legend_pos  = "north west",
             height="9cm",
             width="9cm",
-            xmin=-4e-2,xmax=4e-2,ymin=8e-2,ymin=-8e-2},
+            xmin=-4e-2,xmax=4e-2,ymax=7e-2,ymin=-8e-2},
 
     Plot(
         { color="red",
@@ -417,7 +384,7 @@ a=@pgf Axis( {xlabel=L"$h$ (m)",
         },
         Coordinates(Ap[7][1,:]*sens,Ap[7][2,:])
     ),
-    LegendEntry("Model"),
+    LegendEntry("Learnt model"),
     Plot(
         { color="blue",
             mark  = "o",
@@ -427,13 +394,13 @@ a=@pgf Axis( {xlabel=L"$h$ (m)",
     ),
     LegendEntry("Measured data")
 )
-pgfsave("pp_u165.pdf",a)
+pgfsave("./Figures/exp/pp_u165.pdf",a)
 ##
 
 θ=[θ_;θ_n]
 θ_t=θ
 ll=length(θ_)
-## Compare the bifurcation diagram
+## Plot the bifurcation diagram
 function lt_b_dia(θ_t,ind)
     vel_l=300
     θ_=θ_t[1:ll]
@@ -456,61 +423,8 @@ function lt_b_dia(θ_t,ind)
     return (s=vlTas,u=vlTau,v=Vel)
 end
 
-bd=lt_b_dia(θ_t,1)
-h=[maximum(t_series2[i][1,:])-minimum(t_series2[i][1,:]) for i in 1:length(Vel)]
-h2=[maximum(t_series2[i+4][1,:])-minimum(t_series2[i+4][1,:]) for i in 1:length(Vel2)]
-
-plot(bd.v,bd.s,label="Stable LCO (ML model)",legend=:topleft)
-plot!(bd.v,bd.u,label="Unstable LCO (ML model)")
-plot!(Vel,h,seriestype = :scatter,label="Training data (stable)",xlabel="Wind speed (m/sec)",ylabel="Heave amplitude (m)",markerstrokewidth=0)
-plot!(Vel2,h2,seriestype = :scatter,label="Training data (stable)",xlabel="Wind speed (m/sec)",ylabel="Heave amplitude (m)",markerstrokewidth=0)
-
-sens=18/100
-a=@pgf Axis( {xlabel="Wind speed (m/sec)",
-            ylabel = "Heave amplitude (m)",
-            legend_pos  = "north west",
-            height="11cm",
-            width="15cm",
-            ymin=0,ymax=9e-2,
-            mark_options = {scale=1.5}
-},
-Plot(
-    { color="blue",
-        only_marks,
-    },
-    Coordinates(Vel,h*sens)
-),
-    LegendEntry("Measured data  (stable LCO)"),
-    Plot(
-        { color="red",
-            only_marks,
-            mark = "triangle*"
-        },
-        Coordinates(Vel2,h2*sens)
-    ),
-    LegendEntry("Measured data (unstable LCO)"),
-
-    Plot(
-        { color="blue",
-            no_marks
-        },
-        Coordinates(bd.v,bd.s*sens)
-    ),
-    LegendEntry("Model"),
-
-    Plot(
-        { color="blue",
-            no_marks,
-        },
-        Coordinates(bd.v,bd.u*sens)
-    ),
-)
-
-pgfsave("bd.pdf",a)
-
-## Speed of phase
-
-function Inv_T_u(th0,vel,tol) # This function gives phase portrait of the transformed system from the normal form (unstable LCO)
+## Train the speed of phase
+function Inv_T_u(th0,vel,tol) # This function computes the initial condition of the model at stable LCO
     vel_l=300
     θ_=θ_t[1:ll]
     p1,p2,p3,p4,p5,p6=θ_[1:6]
@@ -536,7 +450,7 @@ function Inv_T_u(th0,vel,tol) # This function gives phase portrait of the transf
     return     theta[argmin(t0)]
 end
 
-function Inv_T_uu(th0,vel,tol) # This function gives phase portrait of the transformed system from the normal form (unstable LCO)
+function Inv_T_uu(th0,vel,tol) # This function computes the initial condition of the model at unstable LCO
     vel_l=300
     θ_=θ_t[1:ll]
     p1,p2,p3,p4,p5,p6=θ_[1:6]
@@ -562,9 +476,7 @@ function Inv_T_uu(th0,vel,tol) # This function gives phase portrait of the trans
     return     theta[argmin(t0)]
 end
 
-function dudt_ph(u,p,t)
-#    θ_=θ_t[1:620]
-#    np1=θ_[end];np2=3.85
+function dudt_ph(u,p,t) # speed of phase
     np1=U₀;np2=s_
     θ=u[1]
     r=u[2]
@@ -579,7 +491,7 @@ function dudt_ph(u,p,t)
     [du₁,du₂,du₃]
 end
 
-function predict_time_T(p) #,uu_t0
+function predict_time_T(p) # Predict the time series of the model with computed initial conditions
     vel_l=300
     θ_=θ_t[1:ll]
     p1,p2,p3,p4,p5,p6=θ_[1:6]
@@ -638,7 +550,6 @@ omega=15.3
 p = vcat(omega,np)
 tol=1e-5
 
-
 # Generate data and initial θ
 np1=U₀;np2=s_
 s_amp=[sqrt(np2/2+sqrt(np2^2+4*(Vel[i]-np1))/2) for i in 1:length(Vel)]
@@ -660,11 +571,56 @@ for i in 1:vl
 end
 A3=t_s
 
-function loss_time_T(p)
+# plot bifurcation diagram
+bd=lt_b_dia(θ_t,1)
+h=[maximum(t_series2[i][1,:])-minimum(t_series2[i][1,:]) for i in 1:length(Vel)]
+h2=[maximum(t_series2[i+4][1,:])-minimum(t_series2[i+4][1,:]) for i in 1:length(Vel2)]
+
+a=@pgf Axis( {xlabel="Wind speed (m/sec)",
+            ylabel = "Heave amplitude (m)",
+            legend_pos  = "north west",
+            height="11cm",
+            width="15cm",
+            ymin=0,ymax=9e-2,
+            mark_options = {scale=1.5}
+},
+Plot(
+    { color="blue",
+        only_marks,
+    },
+    Coordinates(Vel,h*sens)
+),
+    LegendEntry("Measured data  (stable LCO)"),
+    Plot(
+        { color="red",
+            only_marks,
+            mark = "triangle*"
+        },
+        Coordinates(Vel2,h2*sens)
+    ),
+    LegendEntry("Measured data (unstable LCO)"),
+
+    Plot(
+        { color="blue",
+            no_marks
+        },
+        Coordinates(bd.v,bd.s*sens)
+    ),
+    LegendEntry("Learnt model"),
+
+    Plot(
+        { color="blue",
+            no_marks,
+        },
+        Coordinates(bd.v,bd.u*sens)
+    ),
+)
+
+pgfsave("./Figures/exp/bd.pdf",a)
+
+function loss_time_T(p) # Loss function for the time series
     pred = predict_time_T(p)
-#    pred = hcat(pred)
     sum(abs2, A3 .- pred) # + 1e-5*sum(sum.(abs, params(ann)))
-#    norm(pred-A3)
 end
 
 om_scale=0.3
@@ -681,24 +637,13 @@ tol=1e-5
 
 loss_time_T(p)
 
+res_t = DiffEqFlux.sciml_train(loss_time_T, p, ADAM(0.01), maxiters = 200)
+res_t = DiffEqFlux.sciml_train(loss_time_T, res_t.minimizer, BFGS(initial_stepnorm=1e-3), maxiters = 10000)
 
-res1 = DiffEqFlux.sciml_train(loss_time_T, p, ADAM(0.01), maxiters = 500)
-res1 = DiffEqFlux.sciml_train(loss_time_T, res1.minimizer, BFGS(initial_stepnorm=1e-3), maxiters = 10000)
+res_t.minimum
+p=res_t.minimizer
 
-res1.minimum
-p=res1.minimizer
-
-@save "flutter.jld" p
-
-tv=range(0,1,length=1001)
-ind=1
-plot(tv,predict_time_T(p)[2*(ind-1)+1,:],xlims=(0.0,1.0),xlabel="time (sec)", ylabel="Heave (m)",label="Model U = 15.0 m/sec")
-plot!(tv,t_series2[ind][1,:],label="data",seriestype = :scatter,markersize=2,markerstrokewidth=0)
-
-ind=7
-plot!(tv,predict_time_T(p)[2*(ind-1)+1,:],xlims=(0.0,1.0),xlabel="time (sec)", ylabel="Heave (m)",label="Model U = 18.0 m/sec")
-plot!(tv,t_series2[ind][1,:],label="data",seriestype = :scatter,markersize=2,markerstrokewidth=0)
-
+tv=range(0,tl2,length=spl) #Generate a time vector
 a=@pgf Axis( {xlabel="Time (sec)",
             ylabel = L"$h$ (m)",
             legend_pos  = "north west",
@@ -711,7 +656,7 @@ a=@pgf Axis( {xlabel="Time (sec)",
         },
         Coordinates(tv,sens*predict_time_T(p)[2*(1-1)+1,:])
     ),
-    LegendEntry("Model"),
+    LegendEntry("Learnt model"),
     Plot(
         { color="blue",
             no_marks,
@@ -720,7 +665,7 @@ a=@pgf Axis( {xlabel="Time (sec)",
     ),
     LegendEntry("Measured data")
 )
-pgfsave("t_s149.pdf",a)
+pgfsave("./Figures/exp/t_s149.pdf",a)
 
 a=@pgf Axis( {xlabel="Time (sec)",
             ylabel = L"$h$ (m)",
@@ -734,7 +679,7 @@ a=@pgf Axis( {xlabel="Time (sec)",
         },
         Coordinates(tv,sens*predict_time_T(p)[2*(5-1)+1,:])
     ),
-    LegendEntry("Model"),
+    LegendEntry("Learnt model"),
     Plot(
         { color="blue",
             no_marks,
@@ -744,7 +689,7 @@ a=@pgf Axis( {xlabel="Time (sec)",
     LegendEntry("Measured data")
 )
 
-pgfsave("t_u149.pdf",a)
+pgfsave("./Figures/exp/t_u149.pdf",a)
 ##
 
 a=@pgf Axis( {xlabel="Time (sec)",
@@ -759,7 +704,7 @@ a=@pgf Axis( {xlabel="Time (sec)",
         },
         Coordinates(tv,sens*predict_time_T(p)[2*(3-1)+1,:])
     ),
-    LegendEntry("Model"),
+    LegendEntry("Learnt model"),
     Plot(
         { color="blue",
         no_marks
@@ -768,7 +713,7 @@ a=@pgf Axis( {xlabel="Time (sec)",
     ),
     LegendEntry("Measured data")
 )
-pgfsave("t_s165.pdf",a)
+pgfsave("./Figures/exp/t_s165.pdf",a)
 
 a=@pgf Axis( {xlabel="Time (sec)",
             ylabel = L"$h$ (m)",
@@ -782,7 +727,7 @@ a=@pgf Axis( {xlabel="Time (sec)",
         },
         Coordinates(tv,sens*predict_time_T(p)[2*(7-1)+1,:])
     ),
-    LegendEntry("Model"),
+    LegendEntry("Learnt model"),
     Plot(
         { color="blue",
             no_marks,
@@ -791,11 +736,9 @@ a=@pgf Axis( {xlabel="Time (sec)",
     ),
     LegendEntry("Measured data")
 )
-pgfsave("t_u165.pdf",a)
+pgfsave("./Figures/exp/t_u165.pdf",a)
 
-@save "flutter_exp.jld"
-
-function plot_trans(vel,a_l,amp) # plotting transformation)
+function plot_trans(vel,a_l,amp) # plotting transformation
     vel_l=300
     θ_=θ_t[1:ll]
     p1,p2,p3,p4,p5,p6=θ_[1:6]
@@ -813,16 +756,18 @@ function plot_trans(vel,a_l,amp) # plotting transformation)
         vl[j][:,i]=[s_amp[j]*cos(theta[i]),s_amp[j]*sin(theta[i])]
         end
     end
-
-    vlT=[dis*norm(vl[i][:,1])^2+(T+reshape(ann_l([norm(vl[i][:,1]),Vel[i]-U₀],θ_[7:end-2]),2,2)/scale_f2)*(vl[i])+Array_chain([vl[i];(Vel[i]-np1)*ones(1,θ_l)],ann,pn)/scale_f for i in 1:length(Vel)]
+    dis=transpose([p5*ones(θ_l) p6*ones(θ_l)])/scale_f_l
+    vlT=[dis*norm(vl[i][:,1])^2/scale_f_l+(T+reshape(ann_l([norm(vl[i][:,1]),Vel[i]-U₀],θ_[7:end-2]),2,2)/scale_f2)*(vl[i])+Array_chain([vl[i];(Vel[i]-np1)*ones(1,θ_l)],ann,pn)/scale_f for i in 1:length(Vel)]
     vlT
 end
-U₀
 
+vel=15.0;a_l=5;amp=1.52
 vv=[15.0,15.0+2.5/3,15.0+5/3,17.5]
+i=1
 
 bb=nf_dis(U₀,s_,vv,vv)
-U_a=[1.52 1.68 1.77 1.85]
+U_a=[1.85 1.85 1.85 1.85]
+U_a=[3.0 3.0 3.0 3.0]
 
 ind=1
 b=plot_trans(vv[ind],5,U_a[ind])
@@ -844,7 +789,7 @@ axis = @pgf Axis(
 push!(axis, a)
 end
 axis
-pgfsave("Ut_15.pdf",axis)
+pgfsave("./Figures/exp/Ut_15.pdf",axis)
 
 ind=2
 b=plot_trans(vv[ind],5,U_a[ind])
@@ -866,7 +811,7 @@ axis = @pgf Axis(
 push!(axis, a)
 end
 axis
-pgfsave("Ut_1583.pdf",axis)
+pgfsave("./Figures/exp/Ut_1583.pdf",axis)
 
 ind=3
 b=plot_trans(vv[ind],5,U_a[ind])
@@ -888,7 +833,7 @@ axis = @pgf Axis(
 push!(axis, a)
 end
 axis
-pgfsave("Ut_16_66.pdf",axis)
+pgfsave("./Figures/exp/Ut_16_66.pdf",axis)
 
 ind=4
 b=plot_trans(vv[ind],5,U_a[ind])
@@ -910,14 +855,310 @@ axis = @pgf Axis(
 push!(axis, a)
 end
 axis
-pgfsave("Ut_17_5.pdf",axis)
+pgfsave("./Figures/exp/Ut_17_5.pdf",axis)
 
-np1=U₀;np2=s_
-vel_l=500
-V=range(np1-np2^2/4+1e-7, stop = np1, length = vel_l)
-del=V-U₀*ones(length(V))
-va2=s_*ones(length(V))
-s_amp=sqrt.(va2/2+sqrt.(va2.^2+4*del)/2)
-u_amp=sqrt.(va2/2-sqrt.(va2.^2+4*del)/2)
-plot(V,s_amp)
-plot!(V,u_amp)
+[p5,p6]*norm(uu[i])^2/scale_f_l+(T+reshape(ann_l([norm(uu[i][:,1]),vel-U₀],θ_[7:end-1]),2,2)/scale_f2)*uu[i]+ann([uu[i];vel-np1],pn)/scale_f
+
+function U_trans1(x,y) # plotting transformation
+    p1,p2,p3,p4,p5,p6=θ_[1:6]
+    T=[p1 p3;p2 p4]
+    U₀=θ_[end-1];np2=θ_[end]
+    pn=θ_n
+    uu=[x,y]
+    z=[p5,p6]*norm(uu)^2/scale_f_l+(T+reshape(ann_l([norm(uu),vel-U₀],θ_[7:end-2]),2,2)/scale_f2)*uu+ann([uu;vel-U₀],pn)/scale_f
+    z[1]
+end
+
+function U_trans2(x,y) # plotting transformation
+    p1,p2,p3,p4,p5,p6=θ_[1:6]
+    T=[p1 p3;p2 p4]
+    U₀=θ_[end-1];np2=θ_[end]
+    pn=θ_n
+    uu=[x,y]
+    z=[p5,p6]*norm(uu)^2/scale_f_l+(T+reshape(ann_l([norm(uu),vel-U₀],θ_[7:end-2]),2,2)/scale_f2)*uu+ann([uu;vel-U₀],pn)/scale_f
+    z[2]
+end
+
+x = range(-3; stop = 3, length = 50)
+y = range(-3; stop = 3, length = 50)
+t=range(0,2π,length=100)
+
+##Transformation at wind speed 15
+
+vel=15
+s_amp=sqrt(s_/2+sqrt(s_^2+4*(vel-U₀))/2)
+u_amp=sqrt(s_/2-sqrt(s_^2+4*(vel-U₀))/2)
+
+axis = @pgf Axis(
+
+    {xlabel=L"$u_1$ ",
+                ylabel =L"$u_2$",
+                zlabel=L"$U_1(u_1,u_2,\mu-\mu_0)$",
+                legend_pos  = "north east",
+                height="9cm",
+                width="12cm","no marks",
+#                colorbar,
+#        "colormap/jet"
+        },
+#        Legend(["Stable LCO", "Unstable LCO"])
+
+)
+
+x1=s_amp*cos.(t)
+y1=s_amp*sin.(t)
+x2=u_amp*cos.(t)
+y2=u_amp*sin.(t)
+
+b=@pgf Plot3(
+    {color="blue",
+    style ={dashed,thick},
+        no_marks,
+    },
+    Coordinates(x2, y2, -0.3*ones(length(x2))+zeros(length(x2)))
+)
+push!(axis, b)
+
+b=@pgf Plot3(
+    {   color="red",
+    style = {thick},
+        no_marks,
+    },
+    Coordinates(x1, y1, -0.3*ones(length(x1))+zeros(length(x1)))
+)
+push!(axis, b)
+
+#add stable LCO
+a=@pgf Plot3(
+    {
+        surf,
+    },
+    Coordinates(x, y, U_trans1.(x, y'))
+)
+push!(axis, a)
+
+b=@pgf Plot3(
+    { color="red",
+    style = {thick},
+        no_marks,
+    },
+    Coordinates(x1, y1, U_trans1.(x1, y1))
+)
+push!(axis, b)
+
+b=@pgf Plot3(
+    {color="blue",
+    style ={dashed,thick},
+        no_marks,
+    },
+    Coordinates(x2, y2, U_trans1.(x2, y2))
+)
+push!(axis, b)
+
+pgfsave("./Figures/exp/U1surf_15.pdf",axis)
+
+axis = @pgf Axis(
+
+    {xlabel=L"$u_1$ ",
+                ylabel =L"$u_2$",
+                zlabel=L"$U_2(u_1,u_2,\mu-\mu_0)$",
+                legend_pos  = "north east",
+                height="9cm",
+                width="12cm","no marks",
+#                colorbar,
+#        "colormap/jet"
+        },
+#        Legend(["Stable LCO", "Unstable LCO"])
+
+)
+
+x1=s_amp*cos.(t)
+y1=s_amp*sin.(t)
+x2=u_amp*cos.(t)
+y2=u_amp*sin.(t)
+
+b=@pgf Plot3(
+    {color="blue",
+    style ={dashed,thick},
+        no_marks,
+    },
+    Coordinates(x2, y2, -0.3*ones(length(x2))+zeros(length(x2)))
+)
+push!(axis, b)
+
+b=@pgf Plot3(
+    {   color="red",
+    style = {thick},
+        no_marks,
+    },
+    Coordinates(x1, y1, -0.3*ones(length(x1))+zeros(length(x1)))
+)
+push!(axis, b)
+
+#add stable LCO
+a=@pgf Plot3(
+    {
+        surf,
+    },
+    Coordinates(x, y, U_trans2.(x, y'))
+)
+push!(axis, a)
+
+b=@pgf Plot3(
+    { color="red",
+    style = {thick},
+        no_marks,
+    },
+    Coordinates(x1, y1, U_trans2.(x1, y1))
+)
+push!(axis, b)
+
+b=@pgf Plot3(
+    {color="blue",
+    style ={dashed,thick},
+        no_marks,
+    },
+    Coordinates(x2, y2, U_trans2.(x2, y2))
+)
+push!(axis, b)
+pgfsave("./Figures/exp/U2surf_15.pdf",axis)
+## Transformation at wind speed 17.5
+vel=17.5
+s_amp=sqrt(s_/2+sqrt(s_^2+4*(vel-U₀))/2)
+u_amp=sqrt(s_/2-sqrt(s_^2+4*(vel-U₀))/2)
+x1=s_amp*cos.(t)
+y1=s_amp*sin.(t)
+x2=u_amp*cos.(t)
+y2=u_amp*sin.(t)
+
+axis = @pgf Axis(
+
+    {xlabel=L"$u_1$ ",
+                ylabel =L"$u_2$",
+                zlabel=L"$U_1(u_1,u_2,\mu-\mu_0)$",
+                legend_pos  = "north east",
+                height="9cm",
+                width="12cm","no marks",
+#                colorbar,
+#        "colormap/jet"
+        },
+#        Legend(["Stable LCO", "Unstable LCO"])
+
+)
+
+b=@pgf Plot3(
+    {color="blue",
+    style ={dashed,thick},
+        no_marks,
+    },
+    Coordinates(x2, y2, -0.4*ones(length(x2))+zeros(length(x2)))
+)
+push!(axis, b)
+
+b=@pgf Plot3(
+    {   color="red",
+    style = {thick},
+        no_marks,
+    },
+    Coordinates(x1, y1, -0.4*ones(length(x1))+zeros(length(x1)))
+)
+push!(axis, b)
+
+#add stable LCO
+a=@pgf Plot3(
+    {
+        surf,
+    },
+    Coordinates(x, y, U_trans1.(x, y'))
+)
+push!(axis, a)
+
+b=@pgf Plot3(
+    { color="red",
+    style = {thick},
+        no_marks,
+    },
+    Coordinates(x1, y1, U_trans1.(x1, y1))
+)
+push!(axis, b)
+
+b=@pgf Plot3(
+    {color="blue",
+    style ={dashed,thick},
+        no_marks,
+    },
+    Coordinates(x2, y2, U_trans1.(x2, y2))
+)
+push!(axis, b)
+
+pgfsave("./Figures/exp/U1surf_175.pdf",axis)
+
+axis = @pgf Axis(
+
+    {xlabel=L"$u_1$ ",
+                ylabel =L"$u_2$",
+                zlabel=L"$U_2(u_1,u_2,\mu-\mu_0)$",
+                legend_pos  = "north east",
+                height="9cm",
+                width="12cm","no marks",
+#                colorbar,
+#        "colormap/jet"
+        },
+#        Legend(["Stable LCO", "Unstable LCO"])
+
+)
+
+x1=s_amp*cos.(t)
+y1=s_amp*sin.(t)
+x2=u_amp*cos.(t)
+y2=u_amp*sin.(t)
+
+b=@pgf Plot3(
+    {color="blue",
+    style ={dashed,thick},
+        no_marks,
+    },
+    Coordinates(x2, y2, -0.3*ones(length(x2))+zeros(length(x2)))
+)
+push!(axis, b)
+
+b=@pgf Plot3(
+    {   color="red",
+    style = {thick},
+        no_marks,
+    },
+    Coordinates(x1, y1, -0.3*ones(length(x1))+zeros(length(x1)))
+)
+push!(axis, b)
+
+#add stable LCO
+a=@pgf Plot3(
+    {
+        surf,
+    },
+    Coordinates(x, y, U_trans2.(x, y'))
+)
+push!(axis, a)
+
+b=@pgf Plot3(
+    { color="red",
+    style = {thick},
+        no_marks,
+    },
+    Coordinates(x1, y1, U_trans2.(x1, y1))
+)
+push!(axis, b)
+
+b=@pgf Plot3(
+    {color="blue",
+    style ={dashed,thick},
+        no_marks,
+    },
+    Coordinates(x2, y2, U_trans2.(x2, y2))
+)
+push!(axis, b)
+pgfsave("./Figures/exp/U2surf_175.pdf",axis)
+
+@save "./saved_file/ML_flutter_exp.jld" p θ_ θ_n θ t_series t_series2 # save the results
+@load "./saved_file/ML_flutter_exp.jld" p θ_ θ_n θ t_series t_series2
+θ_t=vcat(θ_,θ_n)
+ll=length(θ_);U₀=θ_[end-1];s_=θ_[end];sens=18/100
