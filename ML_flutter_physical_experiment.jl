@@ -100,7 +100,6 @@ tt=atan.(uu2,uu1)
 c=LS_harmonics(rr,tt,1,nh).coeff
 AA=hcat(AA,c)
 ##
-
 vel_l=4
 Vel=[14.9,15.6,16.5,17.3]
 Vel2=[14.9,15.6,16.5]
@@ -109,7 +108,6 @@ Vel2=[14.9,15.6,16.5]
 coθ=cos.(θ)
 siθ=sin.(θ)
 ## Normal form
-
 function nf_dis(U₀,s,Vel,Vel2)
     del=Vel-U₀*ones(length(Vel))
     del2=Vel2-U₀*ones(length(Vel2))
@@ -151,7 +149,6 @@ function f_coeff(vlT,Vel,u₀,v₀)
     end
     Pr
 end
-
 
 function predict_lt(θ_t) #predict the linear transformation
     np1=θ_t[end-1];np2=θ_t[end]
@@ -209,7 +206,6 @@ function Array_chain(gu,ann,p) # vectorized input-> vectorized neural net
     end
     AC
 end
-# nonlinear transformation
 
 function loss_lt(θ_t)
     pred = predict_lt(θ_t)
@@ -234,7 +230,6 @@ scale_f2=1e2
 θ=vcat(θ,θl)
 pp=[17.95,3.85]
 θ=vcat(θ,pp) # Initial guess of parameters
-
 ## Add neural network to transformation to improve the model
 function predict_nt(θ_t)
     p1,p2,p3,p4,p5,p6=θ_[1:6]
@@ -287,7 +282,7 @@ loss_nt(θn)
 res_l = DiffEqFlux.sciml_train(loss_lt, θ, ADAM(0.001), maxiters = 800) # First, train the simple model
 U₀=res_l.minimizer[end-1];s_=res_l.minimizer[end]
 θ_=res_l.minimizer
-res_l = DiffEqFlux.sciml_train(loss_lt2, res_l.minimizer, BFGS(initial_stepnorm=1e-4), maxiters = 20000)
+#res_l = DiffEqFlux.sciml_train(loss_lt2, res_l.minimizer, BFGS(initial_stepnorm=1e-4), maxiters = 20000)
 res1 = DiffEqFlux.sciml_train(loss_nt, θn, ADAM(0.001), maxiters = 1000) # Train more complicated model
 res_n = DiffEqFlux.sciml_train(loss_nt, res1.minimizer, BFGS(initial_stepnorm=1e-4), maxiters = 10000)
 
@@ -345,7 +340,6 @@ a=@pgf Axis( {xlabel=L"$h$ (m)",
     LegendEntry("Measured data")
 )
 pgfsave("./Figures/exp/pp_s149pp_u149.pdf",a)
-
 ##
 a=@pgf Axis( {xlabel=L"$h$ (m)",
             ylabel = L"$\alpha$ (rad)",
@@ -398,16 +392,16 @@ pgfsave("./Figures/exp/pp_u165.pdf",a)
 ##
 
 θ=[θ_;θ_n]
-θ_t=θ
+#θ_t=θ
 ll=length(θ_)
 ## Plot the bifurcation diagram
-function lt_b_dia(θ_t,ind)
+
+function lt_b_dia(ind)
     vel_l=300
-    θ_=θ_t[1:ll]
     p1,p2,p3,p4,p5,p6=θ_[1:6]
     T=[p1 p3;p2 p4]
     np1=U₀;np2=s_
-    pn=θ_t[ll+1:end]
+    pn=θ_n
     Vel=range(np1-np2^2/4+1e-7, stop = np1, length = vel_l)
 
     dis=transpose([p5*ones(θ_l) p6*ones(θ_l)])/scale_f_l
@@ -419,18 +413,16 @@ function lt_b_dia(θ_t,ind)
 
     vlTas=[maximum(vlT[i][ind,:])-minimum(vlT[i][ind,:]) for i in 1:length(Vel)]
     vlTau=[maximum(vlT2[i][ind,:])-minimum(vlT2[i][ind,:]) for i in 1:length(Vel)]
-
     return (s=vlTas,u=vlTau,v=Vel)
 end
-
 ## Train the speed of phase
+
 function Inv_T_u(th0,vel,tol) # This function computes the initial condition of the model at stable LCO
     vel_l=300
-    θ_=θ_t[1:ll]
     p1,p2,p3,p4,p5,p6=θ_[1:6]
     T=[p1 p3;p2 p4]
     np1=U₀;np2=s_
-    pn=θ_t[ll+1:end]
+    pn=θ_n
 
     s_amp=sqrt(np2/2+sqrt(np2^2+4*(vel-np1))/2)
     theta=range(-π,stop=π,length=300)
@@ -452,11 +444,10 @@ end
 
 function Inv_T_uu(th0,vel,tol) # This function computes the initial condition of the model at unstable LCO
     vel_l=300
-    θ_=θ_t[1:ll]
     p1,p2,p3,p4,p5,p6=θ_[1:6]
     T=[p1 p3;p2 p4]
     np1=U₀;np2=s_
-    pn=θ_t[ll+1:end]
+    pn=θ_n
 
     s_amp=sqrt(np2/2-sqrt(np2^2+4*(vel-np1))/2)
     theta=range(-π,stop=π,length=300)
@@ -508,7 +499,6 @@ function predict_time_T(p) # Predict the time series of the model with computed 
     delU=vcat(delU,delU2)
     uu=[uu[i]+delU for i in 1:length(Vel)]
     dis=transpose([p5*ones(spl) p6*ones(spl)])/scale_f_l
-
 
     vlT=[dis*norm(uu[i][1:2,1])^2+(T+reshape(ann_l([norm(uu[i][1:2,1]),Vel[i]-U₀],θ_[7:end-1]),2,2)/scale_f2)*(uu[i][1:2,:])+Array_chain(uu[i],ann,pn)/scale_f for i in 1:length(Vel)]
 
@@ -565,14 +555,13 @@ vl=7
 t_s=zeros(vl*2,spl)
 t_series2=[t_series[j][:,1:5:end] for j=1:7]
 
-
 for i in 1:vl
     t_s[[2*(i-1)+1,2*(i-1)+2],:]=t_series2[i][:,1:1001]
 end
 A3=t_s
 
 # plot bifurcation diagram
-bd=lt_b_dia(θ_t,1)
+bd=lt_b_dia(1)
 h=[maximum(t_series2[i][1,:])-minimum(t_series2[i][1,:]) for i in 1:length(Vel)]
 h2=[maximum(t_series2[i+4][1,:])-minimum(t_series2[i+4][1,:]) for i in 1:length(Vel2)]
 
@@ -740,11 +729,10 @@ pgfsave("./Figures/exp/t_u165.pdf",a)
 
 function plot_trans(vel,a_l,amp) # plotting transformation
     vel_l=300
-    θ_=θ_t[1:ll]
     p1,p2,p3,p4,p5,p6=θ_[1:6]
     T=[p1 p3;p2 p4]
     np1=U₀;np2=s_
-    pn=θ_t[ll+1:end]
+    pn=θ_n
     Vel=vel
 
     s_amp=range(0.1,stop=amp,length=a_l)
@@ -766,7 +754,6 @@ vv=[15.0,15.0+2.5/3,15.0+5/3,17.5]
 i=1
 
 bb=nf_dis(U₀,s_,vv,vv)
-U_a=[1.85 1.85 1.85 1.85]
 U_a=[3.0 3.0 3.0 3.0]
 
 ind=1
@@ -777,7 +764,7 @@ axis = @pgf Axis(
                 ylabel =L"$\alpha$ (rad) ",
                 legend_pos  = "south east",
                 height="9cm",
-                width="12cm","no marks",ymin=-9e-2,ymax=8e-2,xmin=-5e-2,xmax=5e-2}
+                width="12cm","no marks",ymin=-15e-2,ymax=15e-2,xmin=-7e-2,xmax=7e-2}
 
 )
 
@@ -799,7 +786,7 @@ axis = @pgf Axis(
                 ylabel =L"$\alpha$ (rad) ",
                 legend_pos  = "south east",
                 height="9cm",
-                width="12cm","no marks",ymin=-9e-2,ymax=8e-2,xmin=-5e-2,xmax=5e-2}
+                width="12cm","no marks",ymin=-15e-2,ymax=15e-2,xmin=-7e-2,xmax=7e-2}
 
 )
 
@@ -821,7 +808,7 @@ axis = @pgf Axis(
                 ylabel =L"$\alpha$ (rad) ",
                 legend_pos  = "south east",
                 height="9cm",
-                width="12cm","no marks",ymin=-9e-2,ymax=8e-2,xmin=-5e-2,xmax=5e-2}
+                width="12cm","no marks",ymin=-15e-2,ymax=15e-2,xmin=-7e-2,xmax=7e-2}
 
 )
 
@@ -843,7 +830,7 @@ axis = @pgf Axis(
                 ylabel =L"$\alpha$ (rad) ",
                 legend_pos  = "south east",
                 height="9cm",
-                width="12cm","no marks",ymin=-9e-2,ymax=8e-2,xmin=-5e-2,xmax=5e-2}
+                width="12cm","no marks",ymin=-15e-2,ymax=15e-2,xmin=-7e-2,xmax=7e-2}
 
 )
 
@@ -857,12 +844,9 @@ end
 axis
 pgfsave("./Figures/exp/Ut_17_5.pdf",axis)
 
-[p5,p6]*norm(uu[i])^2/scale_f_l+(T+reshape(ann_l([norm(uu[i][:,1]),vel-U₀],θ_[7:end-1]),2,2)/scale_f2)*uu[i]+ann([uu[i];vel-np1],pn)/scale_f
-
 function U_trans1(x,y) # plotting transformation
     p1,p2,p3,p4,p5,p6=θ_[1:6]
     T=[p1 p3;p2 p4]
-    U₀=θ_[end-1];np2=θ_[end]
     pn=θ_n
     uu=[x,y]
     z=[p5,p6]*norm(uu)^2/scale_f_l+(T+reshape(ann_l([norm(uu),vel-U₀],θ_[7:end-2]),2,2)/scale_f2)*uu+ann([uu;vel-U₀],pn)/scale_f
@@ -872,7 +856,6 @@ end
 function U_trans2(x,y) # plotting transformation
     p1,p2,p3,p4,p5,p6=θ_[1:6]
     T=[p1 p3;p2 p4]
-    U₀=θ_[end-1];np2=θ_[end]
     pn=θ_n
     uu=[x,y]
     z=[p5,p6]*norm(uu)^2/scale_f_l+(T+reshape(ann_l([norm(uu),vel-U₀],θ_[7:end-2]),2,2)/scale_f2)*uu+ann([uu;vel-U₀],pn)/scale_f
@@ -1158,7 +1141,5 @@ b=@pgf Plot3(
 push!(axis, b)
 pgfsave("./Figures/exp/U2surf_175.pdf",axis)
 
-@save "./saved_file/ML_flutter_exp.jld" p θ_ θ_n θ t_series t_series2 # save the results
-@load "./saved_file/ML_flutter_exp.jld" p θ_ θ_n θ t_series t_series2
-θ_t=vcat(θ_,θ_n)
-ll=length(θ_);U₀=θ_[end-1];s_=θ_[end];sens=18/100
+@save "./saved_file/ML_flutter_exp.jld" p θ_ θ_n θ t_series t_series2 U₀ s_ scale_f_l ann_l ann scale_f2 scale_f # save the results
+@load "./saved_file/ML_flutter_exp.jld" p θ_ θ_n θ t_series t_series2 U₀ s_ scale_f_l ann_l ann scale_f2 scale_f

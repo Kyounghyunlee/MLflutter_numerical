@@ -2,24 +2,24 @@
 # Training data sets are generated from the ODE solutions
 
 using OrdinaryDiffEq,ModelingToolkit,DataDrivenDiffEq,LinearAlgebra, DiffEqSensitivity, Optim,DiffEqFlux, Flux, Printf,PGFPlotsX,LaTeXStrings, JLD2, MAT
-include("Numerical_Cont.jl")
-@load "/Users/kyoung/OneDrive - University of Bristol/Documents/Simulations/Flutter_noise/flutter.jld"
+include("Numerical_Cont_Hopf_CBC.jl")
 # Numerical continuation of the experimental model
 eq=flutter_eq_CBC_nonmu;
 tol=1e-8; #Zero tolerance
-N=150; # collocation points for continuation
-sp=900; # Number of continuation points
+N=100; # collocation points for continuation
+sp=800; # Number of continuation points
 sU=18.0; # Starting point of continuation (wind velocity)
 ds=0.02; # Arclength (note that this remains constant in Numerical_Cont.jl)
-p0=[sU,0,0,0,0,0,0,0,0,0]; # Initial parameter of the eq
-u0=[0.1;0.1;0.1;0;0;0]; # initial perturbation of the system to reach stable LCO
-tl=3.0; # length of time to detect stable LCO from time integration
+#p0=[sU,0,0,0,0,0,0,0,0,0]; # Initial parameter of the eq
+#u0=[0.1;0.1;0.1;0;0;0]; # initial perturbation of the system to reach stable LCO
+#tl=3.0; # length of time to detect stable LCO from time integration
 st=1e-3
 ind=[1,3] #index of projecting plane (Not important if we do not use CBC)
-@time slco=continuation_Hopf_SLCO(eq,tol,N,sp,p0,ds,u0,tl,ind)
+
+@time slco=continuation_flutter(tol,N,sp,sU,ds)
 U=slco.V
 P=slco.P
-amp=amp_LCO(U,N,1,ind)
+amp=amp_LCO(U,1)
 plot(P,amp)
 θ_l=100
 
@@ -301,40 +301,6 @@ function loss_nt(θ_t)
     sum(abs2, AA .- pred) # + 1e-5*sum(sum.(abs, params(ann)))
 end
 
-function nf_dis2(p,Vel,Vel2,θ₀,θu₀,t_info)
-    p1,p2,p3,p4,p5,p6=θ_[1:6]
-    T=[p1 p3;p2 p4]
-    U₀,s=θ_2[1:2]
-    pn=θ_2[3:end]
-    t_end,t_l=t_info
-    p1=p[1]
-    p2=p[2:end]
-    del=Vel-U₀*ones(length(Vel))
-    del2=Vel2-U₀*ones(length(Vel2))
-    va2=s*ones(length(Vel))
-    va2_2=s*ones(length(Vel2))
-    s_amp=sqrt.(va2/2+sqrt.(va2.^2+4*del)/2)
-    u_amp=sqrt.(va2_2/2-sqrt.(va2_2.^2+4*del2)/2)
-
-    t=range(0, stop = t_end, length = t_l)
-    ω₀=p1
-    om=[ω₀+norm(ann2(s_amp[i],p2)) for i in 1:length(Vel)]
-    omu=[ω₀+norm(ann2(u_amp[i],p2)) for i in 1:length(Vel2)]
-    θ=[θ₀[j]*ones(length(t))+om[j]*t for j in 1:length(Vel)]
-    dis=transpose([p5*ones(length(t)) p6*ones(length(t))])/scale_f_l
-    θu=[θu₀[j]*ones(length(t))+omu[j]*t for j in 1:length(Vel2)]
-
-    coθ=[cos.(θ[i]) for i in 1:length(Vel)]
-    siθ=[sin.(θ[i]) for i in 1:length(Vel)]
-    coθu=[cos.(θu[i]) for i in 1:length(Vel2)]
-    siθu=[sin.(θu[i]) for i in 1:length(Vel2)]
-    vl=[s_amp[i]*[coθ[i]';siθ[i]'] for i in 1:length(Vel)]
-    vl2=[u_amp[i]*[coθu[i]';siθu[i]'] for i in 1:length(Vel2)]
-    vlT=[dis*norm(vl[i][:,1])^2+T*(vl[i])+Array_chain([vl[i];(Vel[i]-U₀)*ones(1,length(t))],ann,pn)/scale_f for i in 1:length(Vel)]
-    vlT2=[dis*norm(vl2[i][:,1])^2+T*(vl2[i])+Array_chain([vl2[i];(Vel2[i]-U₀)*ones(1,length(t))],ann,pn)/scale_f for i in 1:length(Vel2)]
-    (v=vlT,v2=vlT2)
-end
-
 hidden=21
 ann = FastChain(FastDense(3, hidden, tanh),FastDense(hidden, hidden, tanh), FastDense(hidden,  2))
 θn = initial_params(ann)
@@ -344,10 +310,10 @@ pp=[18.27,3.65]
 θn=vcat(pp,θn)
 loss_nt(θn)
 
-res1 = DiffEqFlux.sciml_train(loss_nt, θn, ADAM(0.01), maxiters = 300)
+res_n = DiffEqFlux.sciml_train(loss_nt, θn, ADAM(0.01), maxiters = 300)
 
-res1.minimum
-θ_2=res1.minimizer
+res_n.minimum
+θ_2=res_n.minimizer
 
 Ap=lt_pp_n(θ_2)
 
@@ -530,7 +496,7 @@ vv=vcat(bd.v,bd.v)
 aa=vcat(bd.s,bd.u)
 
 #Plot bifurcation diagram
-a=@pgf Axis( {xlabel="Wind speed (m/sec)",
+a=@pgf Axis( {xlabel="Air speed (m/sec)",
             ylabel = "Heave amplitude (m)",
             legend_pos  = "north west",
             height="11cm",
@@ -585,7 +551,7 @@ function Inv_T_u(th0,vel,tol) # This function gives initial conditions of the mo
     np1,np2=θ_2[1:2]
     pn=θ_2[3:end]
     s_amp=sqrt(np2/2+sqrt(np2^2+4*(vel-np1))/2)
-    theta=range(-π,stop=π,length=500)
+    theta=range(-π,stop=π,length=50000)
 
     uu=[[s_amp*cos(theta[i]),s_amp*sin(theta[i])] for i in 1:length(theta)]
     u=[[p5,p6]*norm(uu[i])^2/scale_f_l+T*uu[i]+ann([uu[i];vel-np1],pn)/scale_f for i in 1:length(theta)]
@@ -671,6 +637,7 @@ pn=θ_2[3:end]
 s_amp=[sqrt(np2/2+sqrt(np2^2+4*(Vel[i]-np1))/2) for i in 1:length(Vel)]
 u_amp=[sqrt(np2/2-sqrt(np2^2+4*(Vel2[i]-np1))/2) for i in 1:length(Vel2)]
 theta0=[θ_series[i][1] for i in 1:length(Vel)]
+tol=1e-5
 θ₀=[Inv_T_u(theta0[i],Vel[i],tol) for i in 1:length(Vel)]
 u_t0=[[θ₀[i],s_amp[i],Vel[i]] for i in 1:length(Vel)]
 u_t02=[[s_amp[i]*cos.(θ₀[i]),s_amp[i]*sin.(θ₀[i]),Vel[i]] for i in 1:length(Vel)]
@@ -692,11 +659,11 @@ end
 
 om_scale=0.3
 loss_time_T(p)
-res1 = DiffEqFlux.sciml_train(loss_time_T, p, ADAM(0.01), maxiters = 300)
-res1 = DiffEqFlux.sciml_train(loss_time_T, res1.minimizer, BFGS(initial_stepnorm=1e-3), maxiters = 10000)
+res_t = DiffEqFlux.sciml_train(loss_time_T, p, ADAM(0.01), maxiters = 100)
+res_t = DiffEqFlux.sciml_train(loss_time_T, res1.minimizer, BFGS(initial_stepnorm=1e-3), maxiters = 10000)
 
-res1.minimum
-p=res1.minimizer
+res_t.minimum
+p=res_t.minimizer
 
 tv=range(0,1,length=1001)
 a=@pgf Axis( {xlabel="Time (sec)",
@@ -746,4 +713,5 @@ a=@pgf Axis( {xlabel="Time (sec)",
 )
 pgfsave("./Figures/num_flutter/time_u18.pdf",a)
 
-@save "./saved_file/ML_flutter_num.jld" p θ_ θ_n θ t_series  #save the results
+@save "./saved_file/ML_flutter_num.jld" p θ_ θ_2 θ t_series ann ann3  #save the results
+@load "./saved_file/ML_flutter_num.jld" p θ_ θ_2 θ t_series ann ann3

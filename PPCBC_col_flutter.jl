@@ -793,8 +793,8 @@ amp=amp_LCO(U,1)
 P=vec(P)
 
 #Bifurcation diagram plot
-a=@pgf Axis( {xlabel="Wind speed (m/s)",
-            ylabel = "Heave amplitude (rad)",
+a=@pgf Axis( {xlabel="Air speed (m/s)",
+            ylabel = "Heave amplitude (m)",
             legend_pos  = "north west",
             height="9cm",
             width="13cm",ymin=0,ymax=0.08},
@@ -812,10 +812,10 @@ a=@pgf Axis( {xlabel="Wind speed (m/s)",
         },
         Coordinates(P,amp)
     ),
-    LegendEntry("CBC")
+    LegendEntry("PP-CBC")
 )
 
-pgfsave("cbc_cont.pdf",a)
+pgfsave("./Figures/cbc_cont.pdf",a)
 
 lp=10
 uu=s_cbc.U[lp];p0= (p=[s_cbc.P[lp] 0 0 0 0 0],D=fourier_diff(N))
@@ -857,9 +857,9 @@ a=@pgf Axis( {xlabel=L"$h$ (m)",
         },
         Coordinates(vcat(g2.u[:,1],g.u[1,1]),vcat(g2.u[:,3],g.u[1,3]))
     ),
-    LegendEntry("CBC")
+    LegendEntry("PP-CBC")
 )
-pgfsave("ppcbc_16.pdf",a)
+pgfsave("./Figures/ppcbc_16.pdf",a)
 #Monodromy matrix
 
 xx=[cos(θ) for θ in range(0,2π,length=100)]
@@ -909,7 +909,7 @@ a=@pgf Axis(
                 label = ["b", "b", "b", "b", "b", "b"],
             )
         ),
-            LegendEntry("CBC"),
+            LegendEntry("PP-CBC"),
         Plot(
             { color="black",
                 no_marks
@@ -917,7 +917,7 @@ a=@pgf Axis(
             Coordinates(xx,yy)
         ),
 )
-pgfsave("monodroby_16.pdf",a)
+pgfsave("./Figures/monodroby_16.pdf",a)
 lp=20
 uu=s_cbc.U[lp];p0= (p=[s_cbc.P[lp] 0 0 0 0 0],D=fourier_diff(N))
 jeq=flutter_eq_CBC_J;jeq2=flutter_eq_CBC_J2;

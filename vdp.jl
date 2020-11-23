@@ -11,7 +11,7 @@ using Plots
 using Printf
 using LaTeXStrings
 using Printf,PGFPlotsX, JLD2
-include("Numerical_Cont.jl")
+include("Numerical_Cont_Hopf_CBC.jl")
 
 function vdp(du, u, p, t)
     μ = p[1]
@@ -452,7 +452,6 @@ function predict_time_T_vdp2(p) #,uu_t0
 Pr
 end
 
-
 function loss_time_T_vdp(p)
     pred = predict_time_T_vdp(p)
     sum(abs2, A3 .- pred) # + 1e-5*sum(sum.(abs, params(ann)))
@@ -526,4 +525,5 @@ ind=3
 )
 
 pgfsave("./Figures/num_vdp/vdp_t_100.pdf",a)
-@save "./saved_file/ML_vdp_num.jld" p θ_ θ_n θ t_series  #save the results
+@save "./saved_file/ML_vdp_num.jld" p θ_ θ_2 θ t_series ann ann3
+@load "./saved_file/ML_vdp_num.jld" p θ_ θ_2 θ t_series ann ann3  #save the results
