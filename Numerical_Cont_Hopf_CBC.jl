@@ -736,6 +736,7 @@ function continuation_CBC(tol,ctol,N,sp,sU,ds,nh) #Continuation of CBC zero prob
     end
     return (H=H,U=U,P=P)
 end
+#=
 # Continuation of Equation of motion
 sU=19.0;sp=190;N=100;tol=1e-8;ds=0.08;
 eq=flutter_eq_CBC;u0=[0.1;0.001;0.001;0;0;0];tl=2.0;tol=1e-5;
@@ -981,3 +982,4 @@ Coordinates(xx,yy)
 ),
 )
 pgfsave("monodromy_17.pdf",a)
+=#

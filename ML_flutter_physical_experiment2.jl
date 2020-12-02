@@ -7,7 +7,7 @@ using LinearAlgebra, DiffEqSensitivity, Optim, Statistics
 using DiffEqFlux, Flux
 using Printf,PGFPlotsX,LaTeXStrings, JLD2
 using MAT
-#include("Numerical_Cont.jl")
+include("Numerical_Cont_Hopf_CBC.jl")
 
 ## Save data
 nh=30
@@ -149,54 +149,39 @@ function f_coeff(vlT,Vel,u₀,v₀)
     end
     Pr
 end
-
+#=
 function predict_lt(θ_t) #predict the linear transformation
     np1=θ_t[end-1];np2=θ_t[end]
     nf=nf_dis(np1,np2,Vel,Vel2)
     vl=nf.v;vl2=nf.v2
-    p1,p2,p3,p4,p5,p6=θ_t[1:6]
+    p1,p2,p3,p4,p5,p6,p7,p8,p9,p10,p11,p12=θ_t[1:12]
+
     T=[p1 p3;p2 p4]
+    T2=[p5 p7;p6 p8]
+    T3=[p9 p11;p10 p12]
 
     dis=transpose([p5*ones(θ_l) p6*ones(θ_l)])/scale_f_l
     pn=θ_t
-    vlT=[dis*norm(vl[i][:,1])^2+(T+reshape(ann_l([norm(vl[i][:,1]),Vel[i]-np1],θ_t[7:end-2]),2,2)/scale_f2)*(vl[i]) for i in 1:length(Vel)]
-    vlT2=[dis*norm(vl2[i][:,1])^2+(T+reshape(ann_l([norm(vl2[i][:,1]),Vel2[i]-np1],θ_t[7:end-2]),2,2)/scale_f2)*(vl2[i]) for i in 1:length(Vel2)]
+    vlT=[dis*norm(vl[i][:,1])^2+(T+(T3*(Vel[i]-np1)+T2*norm(vl[i][:,1]))/scale_f2)*(vcat(vl[i],ones(1,length(vl[i][1,:])))) for i in 1:length(Vel)]
+    vlT2=[dis*norm(vl2[i][:,1])^2+(T+(T3*(Vel2[i]-np1)+T2*norm(vl2[i][:,1]))/scale_f2)*(vcat(vl2[i],ones(1,length(vl2[i][1,:])))) for i in 1:length(Vel2)]
 
     Pr=f_coeff(vlT,Vel,0,0)
     Pr2=f_coeff(vlT2,Vel2,0,0)
     PP=hcat(Pr,Pr2)
     PP
 end
-
+=#
 function predict_lt(θ_t) #predict the linear transformation
     np1=θ_t[end-1];np2=θ_t[end]
     nf=nf_dis(np1,np2,Vel,Vel2)
     vl=nf.v;vl2=nf.v2
-    p1,p2,p3,p4,p5,p6=θ_t[1:6]
+    p1,p2,p3,p4=θ_t[1:4]
     T=[p1 p3;p2 p4]
 
-    dis=transpose([p5*ones(θ_l) p6*ones(θ_l)])/scale_f_l
-    pn=θ_t
-    vlT=[dis*norm(vl[i][:,1])^2+T*(vl[i]) for i in 1:length(Vel)]
-    vlT2=[dis*norm(vl2[i][:,1])^2+T*(vl2[i]) for i in 1:length(Vel2)]
+    pn=θ_t[5:end-2]
 
-    Pr=f_coeff(vlT,Vel,0,0)
-    Pr2=f_coeff(vlT2,Vel2,0,0)
-    PP=hcat(Pr,Pr2)
-    PP
-end
-
-function predict_lt2(θ_t) #predict the linear transformation
-    np1=U₀;np2=s_
-    nf=nf_dis(np1,np2,Vel,Vel2)
-    vl=nf.v;vl2=nf.v2
-    p1,p2,p3,p4,p5,p6=θ_t[1:6]
-    T=[p1 p3;p2 p4]
-
-    dis=transpose([p5*ones(θ_l) p6*ones(θ_l)])/scale_f_l
-    pn=θ_t
-    vlT=[dis*norm(vl[i][:,1])^2+(T+reshape(ann_l([norm(vl[i][:,1]),Vel[i]-np1],θ_t[7:end-1]),2,2)/scale_f2)*(vl[i]) for i in 1:length(Vel)]
-    vlT2=[dis*norm(vl2[i][:,1])^2+(T+reshape(ann_l([norm(vl2[i][:,1]),Vel2[i]-np1],θ_t[7:end-1]),2,2)/scale_f2)*(vl2[i]) for i in 1:length(Vel2)]
+    vlT=[T*(vl[i])+reshape(ann_l([norm(vl[i][:,1]),Vel[i]-np1],pn),2,3)/scale_f2*(vcat(vl[i],ones(1,length(vl[i][1,:])))) for i in 1:length(Vel)]
+    vlT2=[T*(vl2[i])+reshape(ann_l([norm(vl2[i][:,1]),Vel[i]-np1],pn),2,3)/scale_f2*(vcat(vl2[i],ones(1,length(vl2[i][1,:]))))   for i in 1:length(Vel2)]
 
     Pr=f_coeff(vlT,Vel,0,0)
     Pr2=f_coeff(vlT2,Vel2,0,0)
@@ -205,14 +190,17 @@ function predict_lt2(θ_t) #predict the linear transformation
 end
 
 function lt_pp(θ_t) # This function gives phase portrait of the transformed system from the normal form
-    np1=U₀;np2=s_
+    np1=θ_t[end-1];np2=θ_t[end]
     nf=nf_dis(np1,np2,Vel,Vel2)
     vl=nf.v;vl2=nf.v2
-    p1,p2,p3,p4,p5,p6=θ_t[1:6]
+    p1,p2,p3,p4=θ_t[1:4]
     T=[p1 p3;p2 p4]
-    dis=transpose([p5*ones(θ_l) p6*ones(θ_l)])/scale_f_l
-    vlT=[dis*norm(vl[i][:,1])^2+(T+reshape(ann_l([norm(vl[i][:,1]),Vel[i]-np1],θ_t[7:end-2]),2,2)/scale_f2)*(vl[i]) for i in 1:length(Vel)]
-    vlT2=[dis*norm(vl2[i][:,1])^2+(T+reshape(ann_l([norm(vl2[i][:,1]),Vel2[i]-np1],θ_t[7:end-2]),2,2)/scale_f2)*(vl2[i]) for i in 1:length(Vel2)]
+
+    pn=θ_t[5:end-2]
+
+    vlT=[T*(vl[i])+reshape(ann_l([norm(vl[i][:,1]),Vel[i]-np1],pn),2,3)/scale_f2*(vcat(vl[i],ones(1,length(vl[i][1,:])))) for i in 1:length(Vel)]
+    vlT2=[T*(vl2[i])+reshape(ann_l([norm(vl2[i][:,1]),Vel[i]-np1],pn),2,3)/scale_f2*(vcat(vl2[i],ones(1,length(vl2[i][1,:]))))   for i in 1:length(Vel2)]
+
     vcat(vlT,vlT2)
 end
 
@@ -238,30 +226,36 @@ end
 rot=π*0.1
 R=[cos(rot) -sin(rot);sin(rot) cos(rot)]
 θ=vec(1e-2*R*[8.0 0.0;0.0 1.7])
-θ=vcat(θ,zeros(2))
-scale_f_l=1e1 # optimization works for scale_f_l>=50 for small scale_f_l optimization does not work.
 
-hidden=12
-ann_l = FastChain(FastDense(2, hidden, tanh),FastDense(hidden, hidden, tanh), FastDense(hidden,  4))
+hidden=15
+ann_l = FastChain(FastDense(2, hidden, tanh),FastDense(hidden, hidden, tanh), FastDense(hidden,  6))
 θl = initial_params(ann_l)
-scale_f2=1e2
+scale_f2=1e3
 θ=vcat(θ,θl)
 pp=[17.95,3.85]
-θ=vcat(θ,pp) # Initial guess of parameters
+θ=vcat(θ,pp)
+ # Initial guess of parameters
 ## Add neural network to transformation to improve the model
-function predict_nt(θ_t)
-    p1,p2,p3,p4,p5,p6=θ_[1:6]
-    T=[p1 p3;p2 p4]
-    dis=transpose([p5*ones(θ_l) p6*ones(θ_l)])/scale_f_l
-    np1=U₀;np2=s_
-    pn=θ_t
-    T=[p1 p3;p2 p4]
 
+function Nt(vl,T,Vel,pn,pl,np1,np2)
+vlT=[T*(vl[i])+reshape(ann_l([norm(vl[i][:,1]),Vel[i]-np1],pl),2,3)/scale_f2*(vcat(vl[i],ones(1,length(vl[i][1,:]))))+Array_chain([vl[i];(Vel[i]-np1)*ones(1,θ_l)],ann,pn)/scale_f for i in 1:length(Vel)]
+vlT
+end
+
+function predict_nt(θ_t)
+    np1=U₀;np2=s_
     nf=nf_dis(np1,np2,Vel,Vel2)
     vl=nf.v;vl2=nf.v2
+    p1,p2,p3,p4=θ_[1:4]
+    pl=θ_[5:end-2]
+    T=[p1 p3;p2 p4]
+    pn=θ_t
 
-    vlT=[dis*norm(vl[i][:,1])^2+(T+reshape(ann_l([norm(vl[i][:,1]),Vel[i]-U₀],θ_[7:end-2]),2,2)/scale_f2)*(vl[i])+Array_chain([vl[i];(Vel[i]-np1)*ones(1,θ_l)],ann,pn)/scale_f for i in 1:length(Vel)]
-    vlT2=[dis*norm(vl2[i][:,1])^2+(T+reshape(ann_l([norm(vl2[i][:,1]),Vel[i]-U₀],θ_[7:end-2]),2,2)/scale_f2)*(vl2[i])+Array_chain([vl2[i];(Vel2[i]-np1)*ones(1,θ_l)],ann,pn)/scale_f for i in 1:length(Vel2)]
+    #vlT=[dis*norm(vl[i][:,1])^2+(T+(T3*(Vel[i]-np1)+T2*norm(vl[i][:,1]))/scale_f2)*(vl[i])+Array_chain([vl[i];(Vel[i]-np1)*ones(1,θ_l)],ann,pn)/scale_f for i in 1:length(Vel)]
+    #vlT2=[dis*norm(vl2[i][:,1])^2+(T+(T3*(Vel2[i]-np1)+T2*norm(vl2[i][:,1]))/scale_f2)*(vl2[i])+Array_chain([vl2[i];(Vel2[i]-np1)*ones(1,θ_l)],ann,pn)/scale_f for i in 1:length(Vel2)]
+
+    vlT= Nt(vl,T,Vel,pn,pl,np1,np2)
+    vlT2=Nt(vl2,T,Vel2,pn,pl,np1,np2)
 
     Pr=f_coeff(vlT,Vel,0,0)
     Pr2=f_coeff(vlT2,Vel2,0,0)
@@ -269,18 +263,20 @@ function predict_nt(θ_t)
 end
 
 function lt_pp_n(θ_t) # This function gives phase portrait of the transformed system from the normal form (stable LCO)
-    p1,p2,p3,p4,p5,p6=θ_[1:6]
-    T=[p1 p3;p2 p4]
-    dis=transpose([p5*ones(θ_l) p6*ones(θ_l)])/scale_f_l
     np1=U₀;np2=s_
-    pn=θ_t
-    T=[p1 p3;p2 p4]
-
     nf=nf_dis(np1,np2,Vel,Vel2)
     vl=nf.v;vl2=nf.v2
+    p1,p2,p3,p4=θ_[1:4]
+    pl=θ_[5:end-2]
+    T=[p1 p3;p2 p4]
+    pn=θ_t
 
-    vlT=[dis*norm(vl[i][:,1])^2+(T+reshape(ann_l([norm(vl[i][:,1]),Vel[i]-U₀],θ_[7:end-2]),2,2)/scale_f2)*(vl[i])+Array_chain([vl[i];(Vel[i]-np1)*ones(1,θ_l)],ann,pn)/scale_f for i in 1:length(Vel)]
-    vlT2=[dis*norm(vl2[i][:,1])^2+(T+reshape(ann_l([norm(vl2[i][:,1]),Vel[i]-U₀],θ_[7:end-2]),2,2)/scale_f2)*(vl2[i])+Array_chain([vl2[i];(Vel2[i]-np1)*ones(1,θ_l)],ann,pn)/scale_f for i in 1:length(Vel2)]
+    vlT= Nt(dis,vl,T,Vel,pn,pl,np1,np2)
+    vlT2=Nt(dis,vl2,T,Vel2,pn,pl,np1,np2)
+
+#    vlT=[dis*norm(vl[i][:,1])^2+(T+(T3*(Vel[i]-np1)+T2*norm(vl[i][:,1]))/scale_f2)*(vl[i])+Array_chain([vl[i];(Vel[i]-np1)*ones(1,θ_l)],ann,pn)/scale_f for i in 1:length(Vel)]
+#    vlT2=[dis*norm(vl2[i][:,1])^2+(T+(T3*(Vel2[i]-np1)+T2*norm(vl2[i][:,1]))/scale_f2)*(vl2[i])+Array_chain([vl2[i];(Vel2[i]-np1)*ones(1,θ_l)],ann,pn)/scale_f for i in 1:length(Vel2)]
+
     vcat(vlT,vlT2)
 end
 
@@ -293,18 +289,20 @@ end
 hidden=11
 ann = FastChain(FastDense(3, hidden, tanh),FastDense(hidden, hidden, tanh), FastDense(hidden,  2))
 θn = initial_params(ann)
-scale_f=1e3
+scale_f=2e3
 
-loss_nt(θn)
-
-res_l = DiffEqFlux.sciml_train(loss_lt, θ, ADAM(0.001), maxiters = 800) # First, train the simple model
+res_l = DiffEqFlux.sciml_train(loss_lt, θ, ADAM(0.001), maxiters = 600) # First, train the simple model
 U₀=res_l.minimizer[end-1];s_=res_l.minimizer[end]
 θ_=res_l.minimizer
 #res_l = DiffEqFlux.sciml_train(loss_lt2, res_l.minimizer, BFGS(initial_stepnorm=1e-4), maxiters = 20000)
-res1 = DiffEqFlux.sciml_train(loss_nt, θn, ADAM(0.001), maxiters = 5000) # Train more complicated model
-res_n = DiffEqFlux.sciml_train(loss_nt, res1.minimizer, BFGS(initial_stepnorm=1e-4), maxiters = 1000)
+#res_l.minimum
+#Ap=lt_pp(θ_)
 
-θ_n=res1.minimizer
+res1 = DiffEqFlux.sciml_train(loss_nt, θn, ADAM(0.001), maxiters = 1500) # Train more complicated model
+res_n = DiffEqFlux.sciml_train(loss_nt, res1.minimizer, BFGS(initial_stepnorm=1e-4), maxiters = 10000)
+
+res_n.minimum
+θ_n=res_n.minimizer
 Ap=lt_pp_n(θ_n)
 
 sens=18/100 # sensitivity of the lasor sensor
@@ -416,8 +414,12 @@ ll=length(θ_)
 
 function lt_b_dia(ind)
     vel_l=300
-    p1,p2,p3,p4,p5,p6=θ_[1:6]
+
+    p1,p2,p3,p4,p5,p6,p7,p8,p9,p10,p11,p12=θ_[1:12]
     T=[p1 p3;p2 p4]
+    T2=[p5 p7;p6 p8]
+    T3=[p9 p11;p10 p12]
+
     np1=U₀;np2=s_
     pn=θ_n
     Vel=range(np1-np2^2/4+1e-7, stop = np1, length = vel_l)
@@ -426,8 +428,11 @@ function lt_b_dia(ind)
     nf=nf_dis(np1,np2,Vel,Vel)
     vl=nf.v;vl2=nf.v2
 
-    vlT=[dis*norm(vl[i][:,1])^2+(T+reshape(ann_l([norm(vl[i][:,1]),Vel[i]-U₀],θ_[7:end-2]),2,2)/scale_f2)*(vl[i])+Array_chain([vl[i];(Vel[i]-np1)*ones(1,θ_l)],ann,pn)/scale_f for i in 1:length(Vel)]
-    vlT2=[dis*norm(vl2[i][:,1])^2+(T+reshape(ann_l([norm(vl2[i][:,1]),Vel[i]-U₀],θ_[7:end-2]),2,2)/scale_f2)*(vl2[i])+Array_chain([vl2[i];(Vel[i]-np1)*ones(1,θ_l)],ann,pn)/scale_f for i in 1:length(Vel)]
+#    vlT=[dis*norm(vl[i][:,1])^2+(T+(T3*(Vel[i]-np1)+T2*norm(vl[i][:,1]))/scale_f2)*(vl[i])+Array_chain([vl[i];(Vel[i]-np1)*ones(1,θ_l)],ann,pn)/scale_f for i in 1:length(Vel)]
+#    vlT2=[dis*norm(vl2[i][:,1])^2+(T+(T3*(Vel2[i]-np1)+T2*norm(vl2[i][:,1]))/scale_f2)*(vl2[i])+Array_chain([vl2[i];(Vel2[i]-np1)*ones(1,θ_l)],ann,pn)/scale_f for i in 1:length(Vel2)]
+
+    vlT=Nt(dis,vl,T,T3,T2,Vel,pn,np1,np2)
+    vlT2=Nt(dis,vl2,T,T3,T2,Vel2,pn,np1,np2)
 
     vlTas=[maximum(vlT[i][ind,:])-minimum(vlT[i][ind,:]) for i in 1:length(Vel)]
     vlTau=[maximum(vlT2[i][ind,:])-minimum(vlT2[i][ind,:]) for i in 1:length(Vel)]

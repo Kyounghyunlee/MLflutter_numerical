@@ -223,7 +223,7 @@ a=@pgf Axis( {xlabel=L"$z_1$",
 pgfsave("./Figures/num_vdp/vdp_1.pdf",a)
 
 
-@pgf Axis( {xlabel=L"$z_1$",
+a=@pgf Axis( {xlabel=L"$z_1$",
             ylabel = L"$z_2$",
             legend_pos  = "north west",
             height="9cm",
