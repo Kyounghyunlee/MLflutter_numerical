@@ -155,32 +155,8 @@ function LT(vl,T,np1,dis,Vel,pn1)
     TT
 end
 
-function LT_v(vl,T,np1,dis,Vel,pn1)
-    TT=dis*norm(vl)^2+(T+reshape(ann_l([norm(vl),Vel-np1],pn1),2,2)/scale_f2)*(vl)
-    TT
-end
-
-
 function predict_lt(θ_t) #predict the linear transformation
     np1=θ_t[end-1];np2=θ_t[end]
-    nf=nf_dis(np1,np2,Vel,Vel2)
-    vl=nf.v;vl2=nf.v2
-    p1,p2,p3,p4,p5,p6=θ_t[1:6]
-    T=[p1 p3;p2 p4]
-
-    dis=transpose([p5*ones(θ_l) p6*ones(θ_l)])/scale_f_l
-    pn1=θ_t[7:end-2]
-    vlT=[LT(vl[i],T,np1,dis,Vel[i],pn1) for i in 1:length(Vel)]
-    vlT2=[LT(vl2[i],T,np1,dis,Vel2[i],pn1) for i in 1:length(Vel2)]
-
-    Pr=f_coeff(vlT,Vel,0,0)
-    Pr2=f_coeff(vlT2,Vel2,0,0)
-    PP=hcat(Pr,Pr2)
-    PP
-end
-
-function predict_lt2(θ_t) #predict the linear transformation
-    np1=U₀;np2=s_
     nf=nf_dis(np1,np2,Vel,Vel2)
     vl=nf.v;vl2=nf.v2
     p1,p2,p3,p4,p5,p6=θ_t[1:6]
@@ -225,12 +201,6 @@ function loss_lt(θ_t)
     pred = predict_lt(θ_t)
     sum(abs2, AA .- pred) # + 1e-5*sum(sum.(abs, params(ann)))
 end
-
-function loss_lt2(θ_t)
-    pred = predict_lt2(θ_t)
-    sum(abs2, AA .- pred) # + 1e-5*sum(sum.(abs, params(ann)))
-end
-
 ## Generate initial guess of the parameters (Simple linear transformation with rotation)
 rot=π*0.1
 R=[cos(rot) -sin(rot);sin(rot) cos(rot)]
@@ -249,24 +219,19 @@ pp=[17.95,3.85]
 ## Add neural network to transformation to improve the model
 
 function Nt(vl,T,Vel,dis,pn1,np1,pn2)
-vlT=LT(vl,T,np1,dis,Vel,pn1)+Array_chain([vl;(Vel-np1)*ones(1,θ_l)],ann,pn2)/scale_f
-vlT
-end
-
-function Nt_v(vl,T,Vel,dis,pn1,np1,pn2)
-vlT=LT_v(vl,T,np1,dis,Vel,pn1)+ann([vl;np1-Vel],pn2)/scale_f
+vlT=LT(vl,T,np1,dis,Vel,pn1)+Array_chain([vl;(Vel-np1)*ones(1,length(vl[1,:]))],ann,pn2)/scale_f
 vlT
 end
 
 function predict_nt(θ_t)
-    np1=θ_[end-1];np2=θ_[end]
+    np1=θ_t[end-1];np2=θ_t[end]
     nf=nf_dis(np1,np2,Vel,Vel2)
     vl=nf.v;vl2=nf.v2
     p1,p2,p3,p4,p5,p6=θ_[1:6]
     T=[p1 p3;p2 p4]
     dis=transpose([p5*ones(θ_l) p6*ones(θ_l)])/scale_f_l
     pn1=θ_[7:end-2]
-    pn2=θ_t
+    pn2=θ_t[1:end-2]
 
     vlT= [Nt(vl[i],T,Vel[i],dis,pn1,np1,pn2) for i in 1:length(Vel)]
     vlT2=[Nt(vl2[i],T,Vel2[i],dis,pn1,np1,pn2) for i in 1:length(Vel2)]
@@ -277,14 +242,14 @@ function predict_nt(θ_t)
 end
 
 function lt_pp_n(θ_t) # This function gives phase portrait of the transformed system from the normal form (stable LCO)
-    np1=θ_[end-1];np2=θ_[end]
+    np1=θ_t[end-1];np2=θ_t[end]
     nf=nf_dis(np1,np2,Vel,Vel2)
     vl=nf.v;vl2=nf.v2
     p1,p2,p3,p4,p5,p6=θ_[1:6]
     T=[p1 p3;p2 p4]
     dis=transpose([p5*ones(θ_l) p6*ones(θ_l)])/scale_f_l
     pn1=θ_[7:end-2]
-    pn2=θ_t
+    pn2=θ_t[1:end-1]
 
     vlT= [Nt(vl[i],T,Vel[i],dis,pn1,np1,pn2) for i in 1:length(Vel)]
     vlT2=[Nt(vl2[i],T,Vel2[i],dis,pn1,np1,pn2) for i in 1:length(Vel2)]
@@ -303,17 +268,25 @@ ann = FastChain(FastDense(3, hidden, tanh),FastDense(hidden, hidden, tanh), Fast
 θn = initial_params(ann)
 scale_f=1e3
 
-res_l = DiffEqFlux.sciml_train(loss_lt, θ, ADAM(0.001), maxiters = 300)
-U₀=res_l.minimizer[end-1];s_=res_l.minimizer[end]
-θ_=res_l.minimizer
-res_l = DiffEqFlux.sciml_train(loss_lt2, res_l.minimizer, BFGS(initial_stepnorm=1e-4), maxiters = 10000) # First, train the simple model
-θ_=res_l.minimizer
+res_l = DiffEqFlux.sciml_train(loss_lt, θ, ADAM(0.001), maxiters = 200)
 
-res1 = DiffEqFlux.sciml_train(loss_nt, θn, ADAM(0.001), maxiters = 500) # Train more complicated model
-res_n = DiffEqFlux.sciml_train(loss_nt, res1.minimizer, BFGS(initial_stepnorm=1e-4), maxiters = 1000)
+θ_=res_l.minimizer
+res_l = DiffEqFlux.sciml_train(loss_lt2, res_l.minimizer, BFGS(initial_stepnorm=1e-4), maxiters = 1000) # First, train the simple model
+θ_=res_l.minimizer
+θn=vcat(θn,[U₀,s_])
+res1 = DiffEqFlux.sciml_train(loss_nt, θn, ADAM(0.001), maxiters = 200) # Train more complicated model
 
-res_n.minimum
-θ_n=res_n.minimizer
+U₀=res1.minimizer[end-1];s_=res1.minimizer[end]
+θ_n=res1.minimizer
+## Define parameters of the model as global variable
+np1=θ_n[end-1];np2=θ_n[end]
+nf=nf_dis(np1,np2,Vel,Vel2)
+vl=nf.v;vl2=nf.v2
+p1,p2,p3,p4,p5,p6=θ_[1:6]
+T=[p1 p3;p2 p4]
+pn1=θ_[7:end-2]
+pn2=θ_n[1:end-2]
+##
 Ap=lt_pp_n(θ_n)
 sens=18/100 # sensitivity of the lasor sensor
 
@@ -415,25 +388,15 @@ a=@pgf Axis( {xlabel=L"$h$ (m)",
     LegendEntry("Measured data")
 )
 pgfsave("./Figures/exp/pp_u165.pdf",a)
-##
 
-θ=[θ_;θ_n]
-#θ_t=θ
-ll=length(θ_)
-## Plot the bifurcation diagram
-
+# Plot the bifurcation diagram
 function lt_b_dia(ind)
     vel_l=300
-    np1=θ_[end-1];np2=θ_[end]
+    np1=θ_n[end-1];np2=θ_n[end]
     Vel=range(np1-np2^2/4+1e-7, stop = np1, length = vel_l)
-
     nf=nf_dis(np1,np2,Vel,Vel)
     vl=nf.v;vl2=nf.v2
-    p1,p2,p3,p4,p5,p6=θ_[1:6]
-    T=[p1 p3;p2 p4]
-    dis=transpose([p5*ones(θ_l) p6*ones(θ_l)])/scale_f_l
-    pn1=θ_[7:end-2]
-    pn2=θ_n
+    dis=transpose([p5*ones(length(vl)) p6*ones(length(vl))])/scale_f_l
 
     vlT= [Nt(vl[i],T,Vel[i],dis,pn1,np1,pn2) for i in 1:length(Vel)]
     vlT2=[Nt(vl2[i],T,Vel[i],dis,pn1,np1,pn2) for i in 1:length(Vel)]
@@ -443,104 +406,33 @@ function lt_b_dia(ind)
     return (s=vlTas,u=vlTau,v=Vel)
 end
 ## Train the speed of the phase
-
-function θ_trans_s(θ_0,vel)
-    θ1=θ_0[1]
-    p1,p2,p3,p4,p5,p6=θ_[1:6]
-    T=[p1 p3;p2 p4]
-
-    dis=[p5,p6]/scale_f_l
-    np1=U₀;np2=s_
-    pn1=θ_[7:end-2]
-    pn2=θ_n
-    s_amp=sqrt(np2/2+sqrt(np2^2+4*(vel-np1))/2)
-    uu=[s_amp*cos(θ1),s_amp*sin(θ1)]
-    Tu=Nt_v(uu,T,vel,dis,pn1,np1,pn2)
-    t0=atan(Tu[2],Tu[1])
-end
-
-function θ_trans_u(θ_0,vel)
-    θ1=θ_0[1]
-    p1,p2,p3,p4,p5,p6=θ_[1:6]
-    T=[p1 p3;p2 p4]
-
-    dis=[p5,p6]/scale_f_l
-    np1=U₀;np2=s_
-    pn1=θ_[7:end-2]
-    pn2=θ_n
-    s_amp=sqrt(np2/2-sqrt(np2^2+4*(vel-np1))/2)
-    uu=[s_amp*cos(θ1),s_amp*sin(θ1)]
-    Tu=Nt_v(uu,T,vel,dis,pn1,np1,pn2)
-    t0=atan(Tu[2],Tu[1])
-end
-
-t0=theta0[1]
-vel=Vel[1]
-θ_0=[t0]
-θ_trans_s(θ_0,Vel[1])
-s=nlsolve(θ_0->θ_trans_s(θ_0,Vel[1])-t0,[t0])
-
-t0=s.zero[1]
-θ_trans_s(t0,Vel[1])
-
 function Inv_T_u(th0,vel) # This function computes the initial condition of the model at stable LCO
     s=nlsolve(θ_0->abs(θ_trans_s(θ_0,vel)-th0),[th0])
     return     s.zero[1]
 end
 
-function Inv_T_uu(th0,vel) # This function computes the initial condition of the model at stable LCO
-    s=nlsolve(θ_0->abs(θ_trans_u(θ_0,vel)-th0),[th0])
-    return     s.zero[1]
-end
-
-function Inv_T_u(th0,vel,tol) # This function computes the initial condition of the model at stable LCO
-    vel_l=300
-    p1,p2,p3,p4,p5,p6=θ_[1:6]
-    T=[p1 p3;p2 p4]
-    np1=U₀;np2=s_
-    pn=θ_n
-
+function Inv_T_u(th0,vel)
     s_amp=sqrt(np2/2+sqrt(np2^2+4*(vel-np1))/2)
-    theta=range(-π,stop=π,length=300)
-
-    uu=[[s_amp*cos(theta[i]),s_amp*sin(theta[i])] for i in 1:length(theta)]
-    u=[[p5,p6]*norm(uu[i])^2/scale_f_l+(T+reshape(ann_l([norm(uu[i][:,1]),vel-U₀],θ_[7:end-1]),2,2)/scale_f2)*uu[i]+ann([uu[i];vel-np1],pn)/scale_f for i in 1:length(theta)]
-    t0=[abs(atan(u[i][2],u[i][1])-th0) for i in 1:length(theta)]
+    ttl=Int(1e4)
+    theta=range(0,2π,length=ttl)
+    uu=[transpose(s_amp*cos.(theta));transpose(s_amp*sin.(theta))]
+    dis=transpose([p5*ones(ttl) p6*ones(ttl)])/scale_f_l
+    Tu=Nt(uu,T,vel,dis,pn1,np1,pn2)
+    t0=[abs(atan(Tu[2,i],Tu[1,i])-th0) for i in 1:length(theta)]
     er=minimum(t0)
-    while er>tol
-    #    global theta,t0
-        theta=range(theta[argmin(t0)-1],theta[argmin(t0)+1],length=300)
-        uu=[[s_amp*cos(theta[i]),s_amp*sin(theta[i])] for i in 1:length(theta)]
-        u=[[p5,p6]*norm(uu[i])^2/scale_f_l+(T+reshape(ann_l([norm(uu[i][:,1]),vel-U₀],θ_[7:end-1]),2,2)/scale_f2)*uu[i]+ann([uu[i];vel-np1],pn)/scale_f for i in 1:length(theta)]
-        t0=[abs(atan(u[i][2],u[i][1])-th0) for i in 1:length(theta)]
-        er=minimum(t0)
-    end
-    return     theta[argmin(t0)]
+return     theta[argmin(t0)]
 end
 
-function Inv_T_uu(th0,vel,tol) # This function computes the initial condition of the model at unstable LCO
-    vel_l=300
-    p1,p2,p3,p4,p5,p6=θ_[1:6]
-    T=[p1 p3;p2 p4]
-    np1=U₀;np2=s_
-    pn=θ_n
-
-    s_amp=sqrt(np2/2-sqrt(np2^2+4*(vel-np1))/2)
-    theta=range(-π,stop=π,length=300)
-
-    uu=[[s_amp*cos(theta[i]),s_amp*sin(theta[i])] for i in 1:length(theta)]
-    u=[[p5,p6]*norm(uu[i])^2/scale_f_l+(T+reshape(ann_l([norm(uu[i][:,1]),vel-U₀],θ_[7:end-1]),2,2)/scale_f2)*uu[i]+ann([uu[i];vel-np1],pn)/scale_f for i in 1:length(theta)]
-    t0=[abs(atan(u[i][2],u[i][1])-th0) for i in 1:length(theta)]
+function Inv_T_uu(th0,vel)
+    u_amp=sqrt(np2/2+sqrt(np2^2-4*(vel-np1))/2)
+    ttl=Int(1e4)
+    theta=range(0,2π,length=ttl)
+    uu=[transpose(u_amp*cos.(theta));transpose(u_amp*sin.(theta))]
+    dis=transpose([p5*ones(ttl) p6*ones(ttl)])/scale_f_l
+    Tu=Nt(uu,T,vel,dis,pn1,np1,pn2)
+    t0=[abs(atan(Tu[2,i],Tu[1,i])-th0) for i in 1:length(theta)]
     er=minimum(t0)
-    while er>tol
-    #    global theta,t0
-        theta=range(theta[argmin(t0)-1],theta[argmin(t0)+1],length=300)
-        uu=[[s_amp*cos(theta[i]),s_amp*sin(theta[i])] for i in 1:length(theta)]
-        u=[[p5,p6]*norm(uu[i])^2/scale_f_l+(T+reshape(ann_l([norm(uu[i][:,1]),vel-U₀],θ_[7:end-1]),2,2)/scale_f2)*uu[i]+ann([uu[i];vel-np1],pn)/scale_f for i in 1:length(theta)]
-        t0=[abs(atan(u[i][2],u[i][1])-th0) for i in 1:length(theta)]
-        er=minimum(t0)
-    end
-    return     theta[argmin(t0)]
+return     theta[argmin(t0)]
 end
 
 function dudt_ph(u,p,t) # speed of phase
@@ -560,11 +452,6 @@ end
 
 function predict_time_T(p) # Predict the time series of the model with computed initial conditions
     vel_l=300
-    p1,p2,p3,p4,p5,p6=θ_[1:6]
-    T=[p1 p3;p2 p4]
-    np1=U₀;np2=s_
-    pn=θ_n
-
     A1=[Array(concrete_solve(ODEProblem(dudt_ph,u_t0[i],(0,tl2),p), Tsit5(), u_t0[i], p, saveat = st,
                          abstol=1e-8, reltol=1e-8,
                          sensealg = InterpolatingAdjoint(autojacvec=ReverseDiffVJP()))) for i in 1:length(Vel)]
@@ -573,10 +460,8 @@ function predict_time_T(p) # Predict the time series of the model with computed 
     delU2=-np1*ones(1,spl)
     delU=vcat(delU,delU2)
     uu=[uu[i]+delU for i in 1:length(Vel)]
-    dis=transpose([p5*ones(spl) p6*ones(spl)])/scale_f_l
-
-    vlT=[dis*norm(uu[i][1:2,1])^2+(T+reshape(ann_l([norm(uu[i][1:2,1]),Vel[i]-U₀],θ_[7:end-2]),2,2)/scale_f2)*(uu[i][1:2,:])+Array_chain(uu[i],ann,pn)/scale_f for i in 1:length(Vel)]
-
+    vl=[uu[i][1:2,:] for i in 1:length(Vel)]
+    vlT= [Nt(vl[i],T,Vel[i],dis,pn1,np1,pn2) for i in 1:length(Vel)]
     Pr=zeros(0,spl)
     for i in 1:length(Vel)
         theta=vlT[i][[1,2],:]
@@ -591,10 +476,9 @@ delU=zeros(2,spl)
 delU2=-np1*ones(1,spl)
 delU=vcat(delU,delU2)
 uu=[uu[i]+delU for i in 1:1:length(Vel2)]
-dis=transpose([p5*ones(spl) p6*ones(spl)])/scale_f_l
 
-vlT=[dis*norm(uu[i][1:2,1])^2+(T+reshape(ann_l([norm(uu[i][1:2,1]),Vel2[i]-U₀],θ_[7:end-1]),2,2)/scale_f2)*(uu[i][1:2,:])+Array_chain(uu[i],ann,pn)/scale_f for i in 1:length(Vel2)]
-
+vl=[uu[i][1:2,:] for i in 1:length(Vel2)]
+vlT= [Nt(vl[i],T,Vel2[i],dis,pn1,np1,pn2) for i in 1:length(Vel2)]
 Pr2=zeros(0,spl)
 for i in 1:length(Vel2)
     theta=vlT[i][[1,2],:]
@@ -603,17 +487,6 @@ end
 ##
 [Pr;Pr2]
 end
-
-tl2=1.0
-st=1e-3
-spl=Int(tl2/st+1)
-vl=length(Vel)
-hidden=21
-ann3 = FastChain(FastDense(3, hidden, tanh),FastDense(hidden, 1, tanh))
-np = initial_params(ann3)
-omega=15.3
-p = vcat(omega,np)
-tol=1e-5
 
 # Generate data and initial θ
 np1=U₀;np2=s_
@@ -691,6 +564,8 @@ om_scale=0.3
 tl2=1.0
 st=1e-3
 spl=Int(tl2/st+1)
+dis=transpose([p5*ones(spl) p6*ones(spl)])/scale_f_l
+
 vl=length(Vel)
 hidden=21
 ann3 = FastChain(FastDense(3, hidden, tanh),FastDense(hidden, 1, tanh))
@@ -699,18 +574,9 @@ omega=16.3
 p = vcat(omega,np)
 tol=1e-5
 
-loss_time_T(p)
-plot(predict_time_T(p)[1,:])
-plot!(A3[1,:])
-plot!(predict_time_T(p)[2,:])
-plot!(A3[2,:])
-plot!(predict_time_T(p)[3,:])
-plot!(A3[3,:])
-
 res_t = DiffEqFlux.sciml_train(loss_time_T, p, ADAM(0.01), maxiters = 200)
 res_t = DiffEqFlux.sciml_train(loss_time_T, res_t.minimizer, BFGS(initial_stepnorm=1e-3), maxiters = 10000)
 
-res_t.minimum
 p=res_t.minimizer
 
 tv=range(0,tl2,length=spl) #Generate a time vector
@@ -810,13 +676,9 @@ pgfsave("./Figures/exp/t_u165.pdf",a)
 
 function plot_trans(vel,a_l,amp) # plotting transformation
     vel_l=300
-    p1,p2,p3,p4,p5,p6=θ_[1:6]
-    T=[p1 p3;p2 p4]
-    np1=U₀;np2=s_
-    pn=θ_n
     Vel=vel
 
-    s_amp=range(0.1,stop=amp,length=a_l)
+    s_amp=range(0.3,stop=amp,length=a_l)
     Vel=vel*ones(a_l)
     theta=range(-π,stop=π,length=θ_l)
     vl=[ones(2,300) for j=1:a_l]
@@ -826,14 +688,16 @@ function plot_trans(vel,a_l,amp) # plotting transformation
         end
     end
     dis=transpose([p5*ones(θ_l) p6*ones(θ_l)])/scale_f_l
-    vlT=[dis*norm(vl[i][:,1])^2/scale_f_l+(T+reshape(ann_l([norm(vl[i][:,1]),Vel[i]-U₀],θ_[7:end-2]),2,2)/scale_f2)*(vl[i])+Array_chain([vl[i];(Vel[i]-np1)*ones(1,θ_l)],ann,pn)/scale_f for i in 1:length(Vel)]
+#    vlT=[dis*norm(vl[i][:,1])^2/scale_f_l+(T+reshape(ann_l([norm(vl[i][:,1]),Vel[i]-U₀],θ_[7:end-2]),2,2)/scale_f2)*(vl[i])+Array_chain([vl[i];(Vel[i]-np1)*ones(1,θ_l)],ann,pn)/scale_f for i in 1:length(Vel)]
+    vlT=[Nt(vl[i],T,Vel[i],dis,pn1,np1,pn2) for i in 1:length(Vel)]
     vlT
 end
 
 vel=15.0;a_l=5;amp=1.52
-vv=[15.0,15.0+2.5/3,15.0+5/3,17.5]
+#vv=[15.0,15.0+2.5/3,15.0+5/3,17.5]
+vv=range(np1-np2^2/4+1e-7, stop = np1, length = 4)
 i=1
-
+np1
 bb=nf_dis(U₀,s_,vv,vv)
 U_a=[3.0 3.0 3.0 3.0]
 
@@ -928,7 +792,7 @@ pgfsave("./Figures/exp/Ut_17_5.pdf",axis)
 function U_trans1(x,y) # plotting transformation
     p1,p2,p3,p4,p5,p6=θ_[1:6]
     T=[p1 p3;p2 p4]
-    pn=θ_n
+    pn=θ_n[1:end-2]
     uu=[x,y]
     z=[p5,p6]*norm(uu)^2/scale_f_l+(T+reshape(ann_l([norm(uu),vel-U₀],θ_[7:end-2]),2,2)/scale_f2)*uu+ann([uu;vel-U₀],pn)/scale_f
     z[1]
@@ -937,7 +801,7 @@ end
 function U_trans2(x,y) # plotting transformation
     p1,p2,p3,p4,p5,p6=θ_[1:6]
     T=[p1 p3;p2 p4]
-    pn=θ_n
+    pn=θ_n[1:end-2]
     uu=[x,y]
     z=[p5,p6]*norm(uu)^2/scale_f_l+(T+reshape(ann_l([norm(uu),vel-U₀],θ_[7:end-2]),2,2)/scale_f2)*uu+ann([uu;vel-U₀],pn)/scale_f
     z[2]
@@ -1153,7 +1017,6 @@ b=@pgf Plot3(
     Coordinates(x2, y2, U_trans1.(x2, y2))
 )
 push!(axis, b)
-
 pgfsave("./Figures/exp/U1surf_175.pdf",axis)
 
 axis = @pgf Axis(

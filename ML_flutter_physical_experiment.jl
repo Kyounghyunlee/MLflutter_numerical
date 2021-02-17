@@ -7,7 +7,7 @@ using LinearAlgebra, DiffEqSensitivity, Optim, Statistics
 using DiffEqFlux, Flux
 using Printf,PGFPlotsX,LaTeXStrings, JLD2
 using MAT
-#include("Numerical_Cont.jl")
+include("Numerical_Cont_Hopf_CBC.jl")
 
 ## Save data
 nh=30
@@ -167,7 +167,7 @@ function predict_lt(θ_t) #predict the linear transformation
     PP=hcat(Pr,Pr2)
     PP
 end
-
+#=
 function predict_lt(θ_t) #predict the linear transformation
     np1=θ_t[end-1];np2=θ_t[end]
     nf=nf_dis(np1,np2,Vel,Vel2)
@@ -185,7 +185,7 @@ function predict_lt(θ_t) #predict the linear transformation
     PP=hcat(Pr,Pr2)
     PP
 end
-
+=#
 function predict_lt2(θ_t) #predict the linear transformation
     np1=U₀;np2=s_
     nf=nf_dis(np1,np2,Vel,Vel2)
@@ -261,7 +261,7 @@ function predict_nt(θ_t)
     vl=nf.v;vl2=nf.v2
 
     vlT=[dis*norm(vl[i][:,1])^2+(T+reshape(ann_l([norm(vl[i][:,1]),Vel[i]-U₀],θ_[7:end-2]),2,2)/scale_f2)*(vl[i])+Array_chain([vl[i];(Vel[i]-np1)*ones(1,θ_l)],ann,pn)/scale_f for i in 1:length(Vel)]
-    vlT2=[dis*norm(vl2[i][:,1])^2+(T+reshape(ann_l([norm(vl2[i][:,1]),Vel[i]-U₀],θ_[7:end-2]),2,2)/scale_f2)*(vl2[i])+Array_chain([vl2[i];(Vel2[i]-np1)*ones(1,θ_l)],ann,pn)/scale_f for i in 1:length(Vel2)]
+    vlT2=[dis*norm(vl2[i][:,1])^2+(T+reshape(ann_l([norm(vl2[i][:,1]),Vel2[i]-U₀],θ_[7:end-2]),2,2)/scale_f2)*(vl2[i])+Array_chain([vl2[i];(Vel2[i]-np1)*ones(1,θ_l)],ann,pn)/scale_f for i in 1:length(Vel2)]
 
     Pr=f_coeff(vlT,Vel,0,0)
     Pr2=f_coeff(vlT2,Vel2,0,0)
@@ -280,7 +280,7 @@ function lt_pp_n(θ_t) # This function gives phase portrait of the transformed s
     vl=nf.v;vl2=nf.v2
 
     vlT=[dis*norm(vl[i][:,1])^2+(T+reshape(ann_l([norm(vl[i][:,1]),Vel[i]-U₀],θ_[7:end-2]),2,2)/scale_f2)*(vl[i])+Array_chain([vl[i];(Vel[i]-np1)*ones(1,θ_l)],ann,pn)/scale_f for i in 1:length(Vel)]
-    vlT2=[dis*norm(vl2[i][:,1])^2+(T+reshape(ann_l([norm(vl2[i][:,1]),Vel[i]-U₀],θ_[7:end-2]),2,2)/scale_f2)*(vl2[i])+Array_chain([vl2[i];(Vel2[i]-np1)*ones(1,θ_l)],ann,pn)/scale_f for i in 1:length(Vel2)]
+    vlT2=[dis*norm(vl2[i][:,1])^2+(T+reshape(ann_l([norm(vl2[i][:,1]),Vel2[i]-U₀],θ_[7:end-2]),2,2)/scale_f2)*(vl2[i])+Array_chain([vl2[i];(Vel2[i]-np1)*ones(1,θ_l)],ann,pn)/scale_f for i in 1:length(Vel2)]
     vcat(vlT,vlT2)
 end
 
@@ -295,16 +295,17 @@ ann = FastChain(FastDense(3, hidden, tanh),FastDense(hidden, hidden, tanh), Fast
 θn = initial_params(ann)
 scale_f=1e3
 
-loss_nt(θn)
+#loss_nt(θn)
 
-res_l = DiffEqFlux.sciml_train(loss_lt, θ, ADAM(0.001), maxiters = 800) # First, train the simple model
+res_l = DiffEqFlux.sciml_train(loss_lt, θ, ADAM(0.001), maxiters = 300) # First, train the simple model
 U₀=res_l.minimizer[end-1];s_=res_l.minimizer[end]
 θ_=res_l.minimizer
-#res_l = DiffEqFlux.sciml_train(loss_lt2, res_l.minimizer, BFGS(initial_stepnorm=1e-4), maxiters = 20000)
-res1 = DiffEqFlux.sciml_train(loss_nt, θn, ADAM(0.001), maxiters = 5000) # Train more complicated model
+res_l = DiffEqFlux.sciml_train(loss_lt2, res_l.minimizer, BFGS(initial_stepnorm=1e-4), maxiters = 10000)
+θ_=res_l.minimizer
+res1 = DiffEqFlux.sciml_train(loss_nt, θn, ADAM(0.001), maxiters = 500) # Train more complicated model
 res_n = DiffEqFlux.sciml_train(loss_nt, res1.minimizer, BFGS(initial_stepnorm=1e-4), maxiters = 1000)
 
-θ_n=res1.minimizer
+θ_n=res_n.minimizer
 Ap=lt_pp_n(θ_n)
 
 sens=18/100 # sensitivity of the lasor sensor

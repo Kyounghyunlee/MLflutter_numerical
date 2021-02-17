@@ -4,7 +4,7 @@
 using OrdinaryDiffEq,ModelingToolkit,DataDrivenDiffEq,LinearAlgebra, DiffEqSensitivity, Optim,DiffEqFlux, Flux, Printf,PGFPlotsX,LaTeXStrings, JLD2, MAT
 include("Numerical_Cont_Hopf_CBC.jl")
 # Numerical continuation of the experimental model
-eq=flutter_eq_CBC_nonmu;
+#eq=flutter_eq_CBC_nonmu;
 tol=1e-8; #Zero tolerance
 N=100; # collocation points for continuation
 sp=800; # Number of continuation points
@@ -81,6 +81,7 @@ function generate_data(vel_l,Vel,nh) # Training data
 
     p_=zeros(9)
     p_=vcat(Vel[1],p_)
+    tl=10.0
     g=get_stable_LCO(p_,u0,tl,tol,eq,stol,rp,ind1,ind2,0.0,0.0,st)
 
     u₀=mean(g.u[:,1]);v₀=mean(g.u[:,3])
@@ -242,7 +243,7 @@ a=@pgf Axis( {xlabel=L"$h$ (m)",
         },
         Coordinates(t_series[1][1,:],t_series[1][2,:])
     ),
-    LegendEntry("Underlying model")
+    LegendEntry("Ground truth")
 )
 
 pgfsave("./Figures/num_flutter/LTU15_5.pdf",a)
@@ -337,7 +338,7 @@ a=@pgf Axis( {xlabel=L"$h$ (m)",
         },
         Coordinates(t_series[ind][1,:],t_series[ind][2,:])
     ),
-    LegendEntry("Underlying model")
+    LegendEntry("Ground truth")
 )
 
 pgfsave("./Figures/num_flutter/NN_U15.pdf",a)
@@ -368,7 +369,7 @@ a=@pgf Axis( {xlabel=L"$h$ (m)",
         },
         Coordinates(vcat(uu.u[1,:],uu.u[1,1]),vcat(uu.u[3,:],uu.u[3,1]))
     ),
-    LegendEntry("Underlying model")
+    LegendEntry("Ground truth")
 )
 
 pgfsave("./Figures/num_flutter/ust_u17.pdf",a)
@@ -398,7 +399,7 @@ a=@pgf Axis( {xlabel=L"$h$ (m)",
         },
         Coordinates(vcat(uu.u[1,:],uu.u[1,1]),vcat(uu.u[3,:],uu.u[3,1]))
     ),
-    LegendEntry("Underlying model")
+    LegendEntry("Ground truth")
 )
 
 pgfsave("./Figures/num_flutter/ust_u179.pdf",a)
@@ -432,7 +433,7 @@ a=@pgf Axis( {xlabel=L"$h$ (m)",
         },
         Coordinates(vcat(uu.u[1,:],uu.u[1,1]),vcat(uu.u[3,:],uu.u[3,1]))
     ),
-    LegendEntry("Underlying model")
+    LegendEntry("Ground truth")
 )
 pgfsave("./Figures/num_flutter/ust_u153.pdf",a)
 
@@ -461,7 +462,7 @@ a=@pgf Axis( {xlabel=L"$h$ (m)",
         },
         Coordinates(vcat(uu.u[1,:],uu.u[1,1]),vcat(uu.u[3,:],uu.u[3,1]))
     ),
-    LegendEntry("Underlying model")
+    LegendEntry("Ground truth")
 )
 pgfsave("./Figures/num_flutter/ust_u1813.pdf",a)
 
@@ -526,7 +527,7 @@ Plot(
         },
         Coordinates(vec(P),amp)
     ),
-    LegendEntry("Underlying model"),
+    LegendEntry("Ground truth"),
     Plot(
         { color="red",
             no_marks
@@ -551,12 +552,13 @@ function Inv_T_u(th0,vel,tol) # This function gives initial conditions of the mo
     np1,np2=θ_2[1:2]
     pn=θ_2[3:end]
     s_amp=sqrt(np2/2+sqrt(np2^2+4*(vel-np1))/2)
-    theta=range(-π,stop=π,length=50000)
+    theta=range(-π,stop=π,length=100000)
 
     uu=[[s_amp*cos(theta[i]),s_amp*sin(theta[i])] for i in 1:length(theta)]
     u=[[p5,p6]*norm(uu[i])^2/scale_f_l+T*uu[i]+ann([uu[i];vel-np1],pn)/scale_f for i in 1:length(theta)]
     t0=[abs(atan(u[i][2],u[i][1])-th0) for i in 1:length(theta)]
     er=minimum(t0)
+#=
     while er>tol
     #    global theta,t0
         theta=range(theta[argmin(t0)-1],theta[argmin(t0)+1],length=500)
@@ -565,6 +567,7 @@ function Inv_T_u(th0,vel,tol) # This function gives initial conditions of the mo
         t0=[abs(atan(u[i][2],u[i][1])-th0) for i in 1:length(theta)]
         er=minimum(t0)
     end
+=#
     return     theta[argmin(t0)]
 end
 
@@ -613,6 +616,7 @@ function predict_time_T(p) #,uu_t0
     uu=[uu[i]+delU for i in 1:vl]
     dis=transpose([p5*ones(spl) p6*ones(spl)])/scale_f_l
 
+    vlT=[dis*norm(vl[i][:,1])^2+T*(vl[i])+Array_chain([vl[i];(Vel[i]-np1)*ones(1,θ_l)],ann,pn)/scale_f for i in 1:length(Vel)]
     vlT=[dis*norm(uu[i][1:2])^2+T*uu[i][1:2,:]+Array_chain(uu[i],ann,pn)/scale_f for i in 1:vl]
     Pr=zeros(0,spl)
     for i in 1:vl
@@ -658,11 +662,9 @@ function loss_time_T(p)
 end
 
 om_scale=0.3
-loss_time_T(p)
-res_t = DiffEqFlux.sciml_train(loss_time_T, p, ADAM(0.01), maxiters = 100)
-res_t = DiffEqFlux.sciml_train(loss_time_T, res1.minimizer, BFGS(initial_stepnorm=1e-3), maxiters = 10000)
 
-res_t.minimum
+res_t = DiffEqFlux.sciml_train(loss_time_T, p, ADAM(0.01), maxiters = 100)
+res_t = DiffEqFlux.sciml_train(loss_time_T, res_t.minimizer, BFGS(initial_stepnorm=1e-3), maxiters = 10000)
 p=res_t.minimizer
 
 tv=range(0,1,length=1001)
@@ -683,9 +685,9 @@ a=@pgf Axis( {xlabel="Time (sec)",
         { color="blue",
             no_marks,
         },
-        Coordinates(tv,t_series[1][1,:])
+        Coordinates(tv,A3[2*(1-1)+1,:])
     ),
-    LegendEntry("Underlying model")
+    LegendEntry("Ground truth")
 )
 
 pgfsave("./Figures/num_flutter/time_u15.pdf",a)
@@ -707,9 +709,9 @@ a=@pgf Axis( {xlabel="Time (sec)",
         { color="blue",
             no_marks,
         },
-        Coordinates(tv,t_series[10][1,:])
+        Coordinates(tv,A3[2*(10-1)+1,:])
     ),
-    LegendEntry("Underlying model")
+    LegendEntry("Ground truth")
 )
 pgfsave("./Figures/num_flutter/time_u18.pdf",a)
 

@@ -218,7 +218,7 @@ a=@pgf Axis( {xlabel=L"$z_1$",
         },
         Coordinates(t_series[1][1,:],t_series[1][2,:])
     ),
-    LegendEntry("Underlying model")
+    LegendEntry("Ground truth")
 )
 pgfsave("./Figures/num_vdp/vdp_1.pdf",a)
 
@@ -244,7 +244,7 @@ a=@pgf Axis( {xlabel=L"$z_1$",
         },
         Coordinates(t_series[3][1,:],t_series[3][2,:])
     ),
-    LegendEntry("Underlying model")
+    LegendEntry("Ground truth")
 )
 
 pgfsave("./Figures/num_vdp/vdp_2.pdf",a)
@@ -497,12 +497,12 @@ a=@pgf Axis( {xlabel="Time (sec)",
         },
         Coordinates(tv,t_s3[ind][1,:])
     ),
-    LegendEntry("Underlying model")
+    LegendEntry("Ground truth")
 )
 pgfsave("./Figures/num_vdp/vdp_t_020.pdf",a)
 
 ind=3
-@pgf Axis( {xlabel="Time (sec)",
+a=@pgf Axis( {xlabel="Time (sec)",
             ylabel = L"$z_1$",
             legend_pos  = "south east",
             height="9cm",
@@ -521,7 +521,7 @@ ind=3
         },
         Coordinates(tv,t_s3[ind][1,:])
     ),
-    LegendEntry("Underlying model")
+    LegendEntry("Ground truth")
 )
 
 pgfsave("./Figures/num_vdp/vdp_t_100.pdf",a)

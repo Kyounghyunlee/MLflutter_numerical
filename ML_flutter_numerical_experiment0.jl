@@ -81,6 +81,7 @@ function generate_data(vel_l,Vel,nh) # Training data
 
     p_=zeros(9)
     p_=vcat(Vel[1],p_)
+    tl=10.0
     g=get_stable_LCO(p_,u0,tl,tol,eq,stol,rp,ind1,ind2,0.0,0.0,st)
 
     u₀=mean(g.u[:,1]);v₀=mean(g.u[:,3])
@@ -257,15 +258,12 @@ ann_s = FastChain(FastDense(1, hidden, tanh),FastDense(hidden, hidden, tanh), Fa
 scale_f1=5e3
 sl=length(θs)
 θ=vcat(θ,θs)
-loss_lt(θ)
 
 rot=-π*0.1
 R=[cos(rot) -sin(rot);sin(rot) cos(rot)]
 θ=vec(1e-2*R*[2.0 0.0;0.0 3])
 θ=vcat(θ,zeros(4))
 scale_f_l=1e2 # optimization works for scale_f_l>=50 for small scale_f_l optimization does not work.
-loss_lt(θ)
-
 
 res1 = DiffEqFlux.sciml_train(loss_lt, θ, ADAM(0.001), maxiters = 800)
 res1 = DiffEqFlux.sciml_train(loss_lt, res1.minimizer, BFGS(initial_stepnorm=1e-3), maxiters = 10000)
@@ -293,7 +291,7 @@ a=@pgf Axis( {xlabel=L"$h$ (m)",
         },
         Coordinates(t_series[1][1,:],t_series[1][2,:])
     ),
-    LegendEntry("Underlying model")
+    LegendEntry("Ground truth")
 )
 
 pgfsave("./Figures/num_flutter/LTU15_5.pdf",a)
@@ -391,7 +389,7 @@ a=@pgf Axis( {xlabel=L"$h$ (m)",
         },
         Coordinates(t_series[ind][1,:],t_series[ind][2,:])
     ),
-    LegendEntry("Underlying model")
+    LegendEntry("Ground truth")
 )
 
 pgfsave("./Figures/num_flutter/NN_U15.pdf",a)
@@ -422,7 +420,7 @@ a=@pgf Axis( {xlabel=L"$h$ (m)",
         },
         Coordinates(vcat(uu.u[1,:],uu.u[1,1]),vcat(uu.u[3,:],uu.u[3,1]))
     ),
-    LegendEntry("Underlying model")
+    LegendEntry("Ground truth")
 )
 
 pgfsave("./Figures/num_flutter/ust_u17.pdf",a)
@@ -452,7 +450,7 @@ a=@pgf Axis( {xlabel=L"$h$ (m)",
         },
         Coordinates(vcat(uu.u[1,:],uu.u[1,1]),vcat(uu.u[3,:],uu.u[3,1]))
     ),
-    LegendEntry("Underlying model")
+    LegendEntry("Ground truth")
 )
 
 pgfsave("./Figures/num_flutter/ust_u179.pdf",a)
@@ -486,7 +484,7 @@ a=@pgf Axis( {xlabel=L"$h$ (m)",
         },
         Coordinates(vcat(uu.u[1,:],uu.u[1,1]),vcat(uu.u[3,:],uu.u[3,1]))
     ),
-    LegendEntry("Underlying model")
+    LegendEntry("Ground truth")
 )
 pgfsave("./Figures/num_flutter/ust_u153.pdf",a)
 
@@ -515,7 +513,7 @@ a=@pgf Axis( {xlabel=L"$h$ (m)",
         },
         Coordinates(vcat(uu.u[1,:],uu.u[1,1]),vcat(uu.u[3,:],uu.u[3,1]))
     ),
-    LegendEntry("Underlying model")
+    LegendEntry("Ground truth")
 )
 pgfsave("./Figures/num_flutter/ust_u1813.pdf",a)
 
@@ -582,7 +580,7 @@ Plot(
         },
         Coordinates(vec(P),amp)
     ),
-    LegendEntry("Underlying model"),
+    LegendEntry("Ground truth"),
     Plot(
         { color="red",
             no_marks
@@ -741,7 +739,7 @@ a=@pgf Axis( {xlabel="Time (sec)",
         },
         Coordinates(tv,t_series[1][1,:])
     ),
-    LegendEntry("Underlying model")
+    LegendEntry("Ground truth")
 )
 
 pgfsave("./Figures/num_flutter/time_u15.pdf",a)
@@ -765,7 +763,7 @@ a=@pgf Axis( {xlabel="Time (sec)",
         },
         Coordinates(tv,t_series[10][1,:])
     ),
-    LegendEntry("Underlying model")
+    LegendEntry("Ground truth")
 )
 pgfsave("./Figures/num_flutter/time_u18.pdf",a)
 
