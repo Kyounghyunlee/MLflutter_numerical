@@ -616,7 +616,7 @@ function predict_time_T(p) #,uu_t0
     uu=[uu[i]+delU for i in 1:vl]
     dis=transpose([p5*ones(spl) p6*ones(spl)])/scale_f_l
 
-    vlT=[dis*norm(vl[i][:,1])^2+T*(vl[i])+Array_chain([vl[i];(Vel[i]-np1)*ones(1,θ_l)],ann,pn)/scale_f for i in 1:length(Vel)]
+#    vlT=[dis*norm(vl[i][:,1])^2+T*(vl[i])+Array_chain([vl[i];(Vel[i]-np1)*ones(1,θ_l)],ann,pn)/scale_f for i in 1:length(Vel)]
     vlT=[dis*norm(uu[i][1:2])^2+T*uu[i][1:2,:]+Array_chain(uu[i],ann,pn)/scale_f for i in 1:vl]
     Pr=zeros(0,spl)
     for i in 1:vl
